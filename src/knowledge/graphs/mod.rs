@@ -384,6 +384,82 @@ impl GraphOp {
             _ => None,
         }
     }
+
+    /// The graph this op changes.
+    pub fn graph_id(&self) -> GraphId {
+        match self {
+            GraphOp::Create { id, .. }
+            | GraphOp::Update { id, .. }
+            | GraphOp::SetSchema { id, .. }
+            | GraphOp::Delete { id } => *id,
+            GraphOp::NodeAdd { graph, .. }
+            | GraphOp::NodeSet { graph, .. }
+            | GraphOp::NodeRemove { graph, .. }
+            | GraphOp::EdgeAdd { graph, .. }
+            | GraphOp::EdgeSet { graph, .. }
+            | GraphOp::EdgeRemove { graph, .. } => *graph,
+        }
+    }
+
+    /// What the op does, in words, against the graphs as they were just
+    /// before it (so a removed node still has its label): `added tool git`,
+    /// `git.version = "2.55"`, `vghydra -has-> git`.
+    pub fn describe(&self, before: &Graphs) -> String {
+        let g = before.graphs.get(&self.graph_id());
+        let short = |id: &Uuid| id.to_string()[..13].to_string();
+        let node = |id: &NodeId| {
+            g.and_then(|g| g.node(id))
+                .map(Node::label)
+                .unwrap_or_else(|| short(id))
+        };
+        let edge = |id: &EdgeId| {
+            g.and_then(|g| g.edge(id))
+                .map(|e| format!("{} -{}-> {}", node(&e.from), e.ty, node(&e.to)))
+                .unwrap_or_else(|| short(id))
+        };
+        match self {
+            GraphOp::Create { name, scope, .. } => format!("created graph {name} ({scope})"),
+            GraphOp::Update { name, scope, .. } => {
+                let mut parts = Vec::new();
+                if let Some(n) = name {
+                    parts.push(format!("renamed to {n}"));
+                }
+                if let Some(s) = scope {
+                    parts.push(format!("scope {s}"));
+                }
+                format!("graph {}", parts.join(", "))
+            }
+            GraphOp::SetSchema { schema, .. } => if schema.is_some() {
+                "set the schema"
+            } else {
+                "cleared the schema"
+            }
+            .into(),
+            GraphOp::Delete { .. } => "deleted the graph".into(),
+            GraphOp::NodeAdd { ty, props, .. } => {
+                match ["label", "name"]
+                    .iter()
+                    .find_map(|k| props.get(*k).and_then(Value::as_str))
+                {
+                    Some(label) => format!("added {ty} {label}"),
+                    None => format!("added a {ty}"),
+                }
+            }
+            GraphOp::NodeSet { id, key, value, .. } => match value {
+                Some(v) => format!("{}.{key} = {v}", node(id)),
+                None => format!("removed {}.{key}", node(id)),
+            },
+            GraphOp::NodeRemove { id, .. } => format!("removed {}", node(id)),
+            GraphOp::EdgeAdd { from, to, ty, .. } => {
+                format!("{} -{ty}-> {}", node(from), node(to))
+            }
+            GraphOp::EdgeSet { id, key, value, .. } => match value {
+                Some(v) => format!("{} {key} = {v}", edge(id)),
+                None => format!("removed {key} from {}", edge(id)),
+            },
+            GraphOp::EdgeRemove { id, .. } => format!("removed {}", edge(id)),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -995,6 +1071,85 @@ mod tests {
                 schema: Some(Schema::default())
             })
             .is_err());
+    }
+
+    #[test]
+    fn describes_ops_against_the_graphs_before_them() {
+        let mut gs = Graphs::default();
+        let (g, pc, git, has) = (
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+            Uuid::now_v7(),
+        );
+        let scan = Source::Observed("scan:machine".into());
+        let ops = [
+            GraphOp::Create {
+                id: g,
+                name: "Machines".into(),
+                scope: "machines".into(),
+            },
+            GraphOp::NodeAdd {
+                graph: g,
+                id: pc,
+                ty: "machine".into(),
+                props: props(json!({ "name": "vg-pc" })),
+                reference: None,
+                source: scan.clone(),
+            },
+            GraphOp::NodeAdd {
+                graph: g,
+                id: git,
+                ty: "tool".into(),
+                props: props(json!({ "name": "git" })),
+                reference: None,
+                source: scan.clone(),
+            },
+            GraphOp::EdgeAdd {
+                graph: g,
+                id: has,
+                from: pc,
+                to: git,
+                ty: "has".into(),
+                props: BTreeMap::new(),
+                source: scan.clone(),
+            },
+            GraphOp::NodeSet {
+                graph: g,
+                id: git,
+                key: "version".into(),
+                value: Some(json!("2.55")),
+                source: scan.clone(),
+            },
+            GraphOp::EdgeRemove {
+                graph: g,
+                id: has,
+                source: scan.clone(),
+            },
+            GraphOp::NodeRemove {
+                graph: g,
+                id: git,
+                source: scan,
+            },
+        ];
+        let mut said = Vec::new();
+        for op in &ops {
+            assert_eq!(op.graph_id(), g);
+            said.push(op.describe(&gs));
+            gs.apply(op).unwrap();
+        }
+        assert_eq!(
+            said,
+            [
+                "created graph Machines (machines)",
+                "added machine vg-pc",
+                "added tool git",
+                "vg-pc -has-> git",
+                "git.version = \"2.55\"",
+                "removed vg-pc -has-> git",
+                "removed git",
+            ]
+        );
     }
 
     #[test]

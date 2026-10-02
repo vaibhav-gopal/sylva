@@ -101,9 +101,16 @@ pub fn find<'g>(g: &'g Graph, m: &Match) -> Vec<&'g Node> {
         .collect()
 }
 
-/// A node by id prefix, exact label (case-insensitive), or `type:label`.
+/// A node by its `key` (exact: unique, and stable across scans), exact label
+/// (case-insensitive), `type:label`, or id prefix.
 pub fn resolve(g: &Graph, q: &str) -> Option<NodeId> {
     let q = q.trim();
+    if let Some(n) = g
+        .nodes()
+        .find(|n| n.prop("key").and_then(Value::as_str) == Some(q))
+    {
+        return Some(n.id);
+    }
     let (ty, label) = match q.split_once(':') {
         Some((t, l)) if g.nodes().any(|n| n.ty == t) => (Some(t), l),
         _ => (None, q),
@@ -179,7 +186,10 @@ pub mod tests {
             ("hub", "machine", ""),
         ] {
             let id = Uuid::now_v7();
-            let props = serde_json::from_value(json!({ "name": name, "lang": lang })).unwrap();
+            let props = serde_json::from_value(
+                json!({ "name": name, "lang": lang, "key": format!("{ty}/{name}") }),
+            )
+            .unwrap();
             gs.apply(&GraphOp::NodeAdd {
                 graph: g,
                 id,
@@ -236,6 +246,7 @@ pub mod tests {
             1
         );
         assert_eq!(resolve(&g, "service:API"), Some(ids["api"]));
+        assert_eq!(resolve(&g, "store/db"), Some(ids["db"]), "by key, exactly");
 
         let out = neighbors(&g, ids["web"], Dir::Out, &None, 1);
         assert_eq!(out.iter().map(|r| r.node).collect::<Vec<_>>(), [ids["api"]]);

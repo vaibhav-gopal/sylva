@@ -148,26 +148,8 @@ impl ChainLog {
                 "these ops don't follow the chain's tip".into(),
             ));
         }
-        let payloads = sealed
-            .iter()
-            .map(|o| codec.encode(&o.op, &o.hash))
-            .collect::<Result<Vec<_>>>()?;
         let tx = self.conn.transaction()?;
-        {
-            let mut insert = tx.prepare("INSERT INTO ops (seq, id, batch, parent, ts, actor, op, hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)")?;
-            for (o, payload) in sealed.iter().zip(&payloads) {
-                insert.execute(params![
-                    o.seq as i64,
-                    o.id.to_string(),
-                    o.batch.to_string(),
-                    o.parent,
-                    o.ts,
-                    serde_json::to_string(&o.actor)?,
-                    payload,
-                    o.hash
-                ])?;
-            }
-        }
+        insert(&tx, sealed, codec)?;
         tx.commit()?;
         let last = sealed.last().expect("non-empty");
         self.tip = Tip {
@@ -175,6 +157,35 @@ impl ChainLog {
             head: Some(last.hash.clone()),
         };
         Ok(())
+    }
+
+    /// Replaces the whole chain with `batches` (each its actor, time and
+    /// ops), sealed afresh from an empty chain, in one transaction. For
+    /// migrations that drop ops from history: every seq and hash is new, so
+    /// it's a new chain, and the caller checks that what it kept still means
+    /// the same. Empty batches are left out.
+    pub fn rewrite<A: Serialize + Clone, O: Serialize>(
+        &mut self,
+        batches: Vec<(A, i64, Vec<O>)>,
+        codec: &impl Codec<O>,
+    ) -> Result<Vec<Sealed<A, O>>> {
+        let mut tip = Tip::default();
+        let mut sealed = Vec::new();
+        for (actor, ts, ops) in batches.into_iter().filter(|b| !b.2.is_empty()) {
+            let batch = seal_batch(tip.seq, tip.head.clone(), ts, &actor, ops)?;
+            let last = batch.last().expect("non-empty");
+            tip = Tip {
+                seq: last.seq,
+                head: Some(last.hash.clone()),
+            };
+            sealed.extend(batch);
+        }
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM ops", [])?;
+        insert(&tx, &sealed, codec)?;
+        tx.commit()?;
+        self.tip = tip;
+        Ok(sealed)
     }
 
     /// Seals `ops` as one batch after the tip and appends them.
@@ -194,10 +205,67 @@ impl ChainLog {
     }
 }
 
+/// Inserts sealed ops as rows (payloads through `codec`).
+fn insert<A: Serialize, O>(
+    tx: &rusqlite::Transaction,
+    sealed: &[Sealed<A, O>],
+    codec: &impl Codec<O>,
+) -> Result<()> {
+    let mut stmt = tx.prepare("INSERT INTO ops (seq, id, batch, parent, ts, actor, op, hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)")?;
+    for o in sealed {
+        stmt.execute(params![
+            o.seq as i64,
+            o.id.to_string(),
+            o.batch.to_string(),
+            o.parent,
+            o.ts,
+            serde_json::to_string(&o.actor)?,
+            codec.encode(&o.op, &o.hash)?,
+            o.hash
+        ])?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::chain::replay;
     use super::*;
+
+    #[test]
+    fn rewrites_the_whole_chain() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("log.db");
+        let mut log = ChainLog::open(&path).unwrap();
+        let user = "user".to_string();
+        log.commit(&user, vec![1i64, -1, 2], 10, &PlainJson)
+            .unwrap();
+        log.commit(&user, vec![-3i64], 11, &PlainJson).unwrap();
+        log.commit(&user, vec![4i64], 12, &PlainJson).unwrap();
+        // Drop the negative ops: a batch left empty goes too.
+        let kept: Vec<(String, i64, Vec<i64>)> = vec![
+            (user.clone(), 10, vec![1, 2]),
+            (user.clone(), 11, vec![]),
+            (user.clone(), 12, vec![4]),
+        ];
+        let sealed = log.rewrite(kept, &PlainJson).unwrap();
+        assert_eq!(sealed.len(), 3);
+        assert_eq!(log.tip().seq, 3);
+        let reopened = ChainLog::open(&path).unwrap();
+        let ops: Vec<Sealed<String, i64>> = reopened.read_since(0, &PlainJson).unwrap();
+        assert_eq!(
+            ops.iter().map(|o| (o.op, o.ts)).collect::<Vec<_>>(),
+            [(1, 10), (2, 10), (4, 12)]
+        );
+        assert_eq!(ops[0].batch, ops[1].batch, "batches stay together");
+        let tip = replay(&ops, u64::MAX, |_| -> std::result::Result<(), String> {
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(&tip, reopened.tip(), "a valid chain");
+        log.commit(&user, vec![5i64], 13, &PlainJson).unwrap();
+        assert_eq!(log.tip().seq, 4, "and it carries on from the new tip");
+    }
 
     #[test]
     fn commits_reopens_and_verifies() {
