@@ -37,6 +37,7 @@ src/
     chain.rs        Sealed<A, O>, hash, check, replay: the hash chain
     sign.rs         feature `sign`: Signer, verify, TrustedKeys, SigDir
     sqlite.rs       feature `sqlite`: ChainLog, Codec
+    crypt.rs        feature `crypt`: MasterKey, Cipher, Encrypted (a Codec)
   knowledge/        feature `knowledge`
     refs.rs         EntityRef (`domain/kind/id`, `files:path`), validate_path
     attrs.rs        AttrDef, AttrType, check_value
@@ -73,7 +74,9 @@ replacing a full scan with the adjacency list changes no result.
 `Dir::Both` merges the two sorted lists; a self-loop appears once.
 
 ### 3.3 Tree
-An ordered forest: roots in order, each node with a parent and ordered children (slot numbers).
+An ordered forest: roots in order, each node with a parent and ordered children (each child's key next
+to its slot, so listing children reads no other slot). `entry` and `root_entries` hand out an `Entry`
+(key, data, parent, child entries) for walks that read a node and its children together.
 `lineage` (the node and its ancestors), `ancestors`, `subtree` and `preorder` are iterators;
 `subtree` and `preorder` take a predicate that prunes a node with its subtree.
 `move_to` refuses cycles, keeps the tree unchanged on any error, and returns `false` when the node
@@ -110,6 +113,14 @@ For a single writer (an application's own store), `chain` seals ops in sequence:
 hash. `check` and `replay` detect gaps, broken links and edited ops. The encoding is pinned by a test,
 because every existing chain depends on it. `sqlite::ChainLog` stores one row per op and runs payloads
 through a `Codec`, which gets the op's hash so an encrypting codec can bind each payload to its row.
+
+### 4.5a Encryption at rest
+`crypt` (feature `crypt`) is that codec. One random `MasterKey` per store; the data key is derived with
+HMAC-SHA256 as `<app>/v1/data`, so applications sharing a master key never share a data key. Each op is
+sealed with XChaCha20-Poly1305, its hash as associated data (a payload moved to another row fails to open),
+and stored as `e1:` + base64(nonce || ciphertext); rows without the prefix read as plain JSON, so a store
+can turn encryption on in place. The format is Alfred's, byte for byte, so its store can move onto it
+without converting anything. Where the master key lives is the application's business.
 
 ### 4.6 Signatures
 `sign::Signer` signs `domain || batch.to_jsonl()`. The domain is the caller's (Tend uses
@@ -170,11 +181,11 @@ behaviour is pinned. Also pinned: the chain's hash encoding, and the written-out
 | Adjacency sorted by edge key | Same order as a scan by key, so results didn't change when the scan went away |
 | Conflicts as data, not errors | Merged histories must always replay; people resolve what doesn't apply |
 | The caller picks the signature domain | One key can't be tricked into signing for another purpose |
+| Encryption keys derived per application | One master key can serve several apps without any two sharing a data key |
 
 ## 9. Next
 
-- Benchmarks in this repo for the structures and the log (Alfred's baseline benches already exercise
-  them through the knowledge model).
+- Alfred's store onto `crypt` (the format already matches), dropping its own copy of the cipher.
 - Serde for the generic structures, for users without the knowledge model.
 - Persisted snapshots for long histories (today snapshots live in memory).
 - A reverse-relation index pattern for projections that ask "what points at this?" often.

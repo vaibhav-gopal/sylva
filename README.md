@@ -10,10 +10,10 @@ Sylva is a small Rust library with three layers:
 | **Log** | `log` | state as the replay of a log of ops: batches, causal order, conflicts as data, time travel, batch files, a hash chain |
 | **Knowledge** | `knowledge` | a typed property graph and a catalog tree built on the two, with schemas, stated vs observed facts, references, queries and diagrams |
 
-Extra features: `sign` (Ed25519 signatures over batches), `sqlite` (the hash chain in SQLite), `ts`
-(TypeScript types for the knowledge model, via ts-rs).
+Extra features: `sign` (Ed25519 signatures over batches), `sqlite` (the hash chain in SQLite), `crypt`
+(encryption at rest for a stored log), `ts` (TypeScript types for the knowledge model, via ts-rs).
 
-It was extracted from [Alfred](../alfred), which uses all of it. The design is in
+It was extracted from [Alfred](../alfred); Alfred and [Tend](../tend) build on it. The design is in
 [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Structures
@@ -70,7 +70,9 @@ let then = h.at(3).0;    // the state after the first 3 batches
 - **Conflicts are data**: an op that no longer applies after a merge is recorded, not fatal.
 - **`files::BatchDir`** keeps one `<id>.jsonl` per batch, so two branches never edit the same file.
 - **`chain`** is the other kind of log: one writer's ops in sequence, each sealing the previous hash, so any edit
-  to the past is detected. `sqlite::ChainLog` stores it, with a codec for encrypting payloads.
+  to the past is detected. `sqlite::ChainLog` stores it, with a codec for encrypting payloads; `crypt::Encrypted`
+  is that codec (XChaCha20-Poly1305, each op sealed with its hash as associated data, keys derived per
+  application from one master key).
 - **`sign`** signs a batch's canonical form with a domain string you choose, so a signature made for one purpose
   can't be replayed as another.
 
@@ -91,5 +93,5 @@ cargo clippy --all-features --all-targets -- -D warnings
 cargo bench --all-features        # benches/: structures and log
 ```
 
-Status: in use by Alfred, not published. The op JSON of the knowledge model is a stored-data contract (it is
+Status: in use by Alfred and Tend, not published. The op JSON of the knowledge model is a stored-data contract (it is
 in Alfred's log and in every repo's `.tend/log`), so it only changes with a migration.
