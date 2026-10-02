@@ -1,5 +1,8 @@
 //! Entity references: every entity is addressed as `<domain>/<kind>/<id>`
-//! (e.g. `recount/entry/0193…`), files as `files:<path>`.
+//! (e.g. `recount/entry/0193…`), files as `files:<path>`, and anything a host
+//! names by path rather than id as `<scheme>:<path>` (`graph:personal/Machines/vghydra`,
+//! `code:alfred/src/lib.rs#open`): what a scheme means, and whether its target
+//! exists, is the host's to say.
 
 use std::fmt;
 use std::str::FromStr;
@@ -20,6 +23,11 @@ pub enum EntityRef {
     File {
         path: String,
     },
+    /// `<scheme>:<path>`: something addressed by a path the host defines.
+    Address {
+        scheme: String,
+        path: String,
+    },
 }
 
 impl fmt::Display for EntityRef {
@@ -27,6 +35,7 @@ impl fmt::Display for EntityRef {
         match self {
             EntityRef::Entity { domain, kind, id } => write!(f, "{domain}/{kind}/{id}"),
             EntityRef::File { path } => write!(f, "files:{path}"),
+            EntityRef::Address { scheme, path } => write!(f, "{scheme}:{path}"),
         }
     }
 }
@@ -41,12 +50,26 @@ impl FromStr for EntityRef {
                 path: path.to_string(),
             });
         }
-        let parts: Vec<&str> = s.split('/').collect();
         let ident = |p: &str| {
             !p.is_empty()
                 && p.bytes()
                     .all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit())
         };
+        if let Some((scheme, path)) = s.split_once(':') {
+            if !ident(scheme) {
+                return invalid(format!("not a reference scheme: '{scheme}' in {s}"));
+            }
+            if path.trim().is_empty() || path.len() > 1024 || path.chars().any(char::is_control) {
+                return invalid(format!(
+                    "a {scheme}: reference needs a path of 1-1024 printable characters: {s}"
+                ));
+            }
+            return Ok(EntityRef::Address {
+                scheme: scheme.to_string(),
+                path: path.to_string(),
+            });
+        }
+        let parts: Vec<&str> = s.split('/').collect();
         match parts.as_slice() {
             [domain, kind, id] if ident(domain) && ident(kind) => Ok(EntityRef::Entity {
                 domain: domain.to_string(),
@@ -56,7 +79,7 @@ impl FromStr for EntityRef {
                     .map_err(|_| Error::Invalid(format!("bad id in reference {s}")))?,
             }),
             _ => invalid(format!(
-                "not an entity reference (domain/kind/id or files:path): {s}"
+                "not an entity reference (domain/kind/id, files:path or scheme:path): {s}"
             )),
         }
     }
@@ -126,6 +149,9 @@ mod tests {
             "Recount/entry/x",
             "files:../x",
             "a/b/not-a-uuid",
+            "Graph:x/y",
+            "graph:",
+            "graph:a\nb",
         ] {
             assert!(bad.parse::<EntityRef>().is_err(), "{bad}");
         }
@@ -133,6 +159,17 @@ mod tests {
             serde_json::to_string(&f).unwrap(),
             r#""files:finance/Receipts/2026/a.pdf""#
         );
+        let a: EntityRef = "graph:personal/Machines/vg hydra".parse().unwrap();
+        assert_eq!(
+            a,
+            EntityRef::Address {
+                scheme: "graph".into(),
+                path: "personal/Machines/vg hydra".into()
+            }
+        );
+        assert_eq!(a.to_string(), "graph:personal/Machines/vg hydra");
+        let back: EntityRef = serde_json::from_str(&serde_json::to_string(&a).unwrap()).unwrap();
+        assert_eq!(back, a);
     }
 
     #[test]

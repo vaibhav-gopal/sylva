@@ -119,6 +119,10 @@ pub struct EdgeType {
     pub to: Vec<String>,
     #[serde(default)]
     pub props: BTreeMap<String, AttrDef>,
+    /// What the edge is called read backwards (`hosts` → `hosted_by`): an edge
+    /// is stored once, and queries may name either direction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inverse: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -131,6 +135,21 @@ pub struct Schema {
     /// Allow node and edge types (and props) the schema doesn't list.
     #[serde(default)]
     pub open: bool,
+}
+
+impl Schema {
+    /// The edge type a name means and whether it reads backwards: `hosts` is
+    /// (`hosts`, false), its inverse `hosted_by` is (`hosts`, true). Names the
+    /// schema doesn't list read forwards as themselves.
+    pub fn edge_name<'a>(&'a self, name: &'a str) -> (&'a str, bool) {
+        if self.edges.contains_key(name) {
+            return (name, false);
+        }
+        match self.edges.iter().find(|(_, t)| t.inverse.as_deref() == Some(name)) {
+            Some((ty, _)) => (ty.as_str(), true),
+            None => (name, false),
+        }
+    }
 }
 
 /// A graph as written out.
@@ -1005,6 +1024,7 @@ mod tests {
                     from: vec!["service".into()],
                     to: vec!["service".into(), "db".into()],
                     props: BTreeMap::new(),
+                    inverse: Some("called_by".into()),
                 },
             )]
             .into(),
@@ -1015,6 +1035,10 @@ mod tests {
             schema: Some(schema),
         })
         .unwrap();
+        let s = gs.graphs[&g].schema.as_ref().unwrap();
+        assert_eq!(s.edge_name("calls"), ("calls", false));
+        assert_eq!(s.edge_name("called_by"), ("calls", true), "an edge read backwards");
+        assert_eq!(s.edge_name("other"), ("other", false));
         let add = |gs: &mut Graphs, ty: &str, p: Value| {
             let id = Uuid::now_v7();
             gs.apply(&GraphOp::NodeAdd {

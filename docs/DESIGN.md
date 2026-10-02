@@ -39,7 +39,7 @@ src/
     sqlite.rs       feature `sqlite`: ChainLog, Codec
     crypt.rs        feature `crypt`: MasterKey, Cipher, Encrypted (a Codec)
   knowledge/        feature `knowledge`
-    refs.rs         EntityRef (`domain/kind/id`, `files:path`), validate_path
+    refs.rs         EntityRef (`domain/kind/id`, `files:path`, `scheme:path` for the host's own addresses), validate_path
     attrs.rs        AttrDef, AttrType, check_value
     trees.rs        catalog Tree, TreeOp, Trees
     graphs/         property Graph, GraphOp, Graphs; query, change, render
@@ -134,8 +134,10 @@ lives) is the application's job.
 Nodes and edges have a string type and JSON props. Every prop, node and edge records its source: stated
 (by a person or an agent) or observed (by a named scanner). An observation never overwrites or removes
 what was stated, and a scanner can re-run any number of times. Schemas (optional, possibly `open`) list
-node types with typed props, and edge types with the node types they may connect. A node may stand for an
-entity owned elsewhere (`ref`), which the owning application checks. On top: `query` (find by type, props
+node types with typed props, and edge types with the node types they may connect and, optionally, the
+edge's name read backwards (`runs_on` ↔ `hosts`; `Schema::edge_name`), since an edge is stored once. A
+node may stand for an entity owned elsewhere (`ref`: `domain/kind/id`, `files:path`, or a host's own
+`scheme:path` such as a node of another graph), which the owning application checks. On top: `query` (find by type, props
 and text; neighbours; paths; impact), `change` (name-based changes, so tools can say
 `{"action": "graph_edge", "from": "web", "to": "api", "type": "calls"}`) and `render` (Mermaid, DOT, D2
 with grouping and focus).
