@@ -13,8 +13,12 @@
 //! - [`chain`] is the other shape of log: a single writer's hash-chained
 //!   sequence of ops, where any edit to the past is detected.
 //! - [`sign`] (feature `sign`) signs and verifies batches.
+//! - [`sqlite`] (feature `sqlite`) stores a hash chain in SQLite, and
+//!   [`crypt`] (feature `crypt`) encrypts what it stores.
 
 pub mod chain;
+#[cfg(feature = "crypt")]
+pub mod crypt;
 pub mod files;
 pub mod history;
 #[cfg(feature = "sign")]

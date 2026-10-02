@@ -15,6 +15,8 @@ log = ["serde", "dep:serde_json", "dep:sha2", "dep:hex"]
 sign = ["log", "dep:ed25519-dalek"]
 # The hash chain stored in SQLite.
 sqlite = ["log", "dep:rusqlite"]
+# Encryption at rest for a stored log (XChaCha20-Poly1305, keys derived per application).
+crypt = ["log", "dep:chacha20poly1305", "dep:hmac", "dep:base64"]
 # Typed property graphs and catalog trees: schemas, stated/observed facts, references, queries, diagrams.
 knowledge = ["serde", "dep:serde_json"]
 # TypeScript types for the knowledge model (ts-rs).
@@ -29,6 +31,9 @@ sha2 = { version = "0.10", optional = true }
 hex = { version = "0.4", optional = true }
 ed25519-dalek = { version = "2", optional = true }
 rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
+hmac = { version = "0.12", optional = true }
+base64 = { version = "0.22", optional = true }
 ts-rs = { version = "12.0.1", features = ["serde-compat", "uuid-impl", "serde-json-impl"], optional = true }
 
 [dev-dependencies]
