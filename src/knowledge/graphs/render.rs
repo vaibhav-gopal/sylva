@@ -58,7 +58,11 @@ fn yes() -> bool {
 /// The nodes and edges a view selects.
 pub fn select<'g>(g: &'g Graph, view: &View) -> (Vec<&'g Node>, Vec<&'g Edge>) {
     let in_focus: Option<BTreeSet<NodeId>> = view.focus.map(|f| {
-        let mut set: BTreeSet<NodeId> = neighbors(g, f, Dir::Both, &view.edge_types, view.depth.unwrap_or(1)).into_iter().map(|r| r.node).collect();
+        let mut set: BTreeSet<NodeId> =
+            neighbors(g, f, Dir::Both, &view.edge_types, view.depth.unwrap_or(1))
+                .into_iter()
+                .map(|r| r.node)
+                .collect();
         set.insert(f);
         set
     });
@@ -78,13 +82,21 @@ pub fn select<'g>(g: &'g Graph, view: &View) -> (Vec<&'g Node>, Vec<&'g Edge>) {
 
 pub fn render(g: &Graph, view: &View, format: Format) -> String {
     let (nodes, edges) = select(g, view);
-    let ids: BTreeMap<NodeId, String> = nodes.iter().enumerate().map(|(i, n)| (n.id, format!("n{}", i + 1))).collect();
+    let ids: BTreeMap<NodeId, String> = nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id, format!("n{}", i + 1)))
+        .collect();
     let group = |n: &Node| -> Option<String> {
         let key = view.group_by.as_deref()?;
         if key == "type" {
             return Some(n.ty.clone());
         }
-        n.prop(key).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))
+        n.prop(key).map(|v| {
+            v.as_str()
+                .map(str::to_string)
+                .unwrap_or_else(|| v.to_string())
+        })
     };
     // Groups in a stable order; ungrouped nodes last.
     let mut groups: BTreeMap<Option<String>, Vec<&Node>> = BTreeMap::new();
@@ -104,7 +116,11 @@ pub fn render(g: &Graph, view: &View, format: Format) -> String {
                     out.push_str(&format!("  subgraph g{gi}[\"{}\"]\n", mermaid_text(name)));
                 }
                 for n in members {
-                    out.push_str(&format!("{pad}{}[\"{}\"]\n", ids[&n.id], mermaid_text(&n.label())));
+                    out.push_str(&format!(
+                        "{pad}{}[\"{}\"]\n",
+                        ids[&n.id],
+                        mermaid_text(&n.label())
+                    ));
                 }
                 if name.is_some() {
                     out.push_str("  end\n");
@@ -112,7 +128,12 @@ pub fn render(g: &Graph, view: &View, format: Format) -> String {
             }
             for e in &edges {
                 match edge_label(view, e) {
-                    Some(l) => out.push_str(&format!("  {} -->|{}| {}\n", ids[&e.from], mermaid_text(l), ids[&e.to])),
+                    Some(l) => out.push_str(&format!(
+                        "  {} -->|{}| {}\n",
+                        ids[&e.from],
+                        mermaid_text(l),
+                        ids[&e.to]
+                    )),
                     None => out.push_str(&format!("  {} --> {}\n", ids[&e.from], ids[&e.to])),
                 }
             }
@@ -124,21 +145,33 @@ pub fn render(g: &Graph, view: &View, format: Format) -> String {
                 Direction::RL => "RL",
                 Direction::BT => "BT",
             };
-            out.push_str(&format!("digraph \"{}\" {{\n  rankdir={rank};\n  node [shape=box];\n", quoted(&g.name)));
+            out.push_str(&format!(
+                "digraph \"{}\" {{\n  rankdir={rank};\n  node [shape=box];\n",
+                quoted(&g.name)
+            ));
             for (gi, (name, members)) in groups.iter().enumerate() {
                 let pad = if name.is_some() { "    " } else { "  " };
                 if let Some(name) = name {
-                    out.push_str(&format!("  subgraph cluster_{gi} {{\n    label=\"{}\";\n", quoted(name)));
+                    out.push_str(&format!(
+                        "  subgraph cluster_{gi} {{\n    label=\"{}\";\n",
+                        quoted(name)
+                    ));
                 }
                 for n in members {
-                    out.push_str(&format!("{pad}{} [label=\"{}\"];\n", ids[&n.id], quoted(&n.label())));
+                    out.push_str(&format!(
+                        "{pad}{} [label=\"{}\"];\n",
+                        ids[&n.id],
+                        quoted(&n.label())
+                    ));
                 }
                 if name.is_some() {
                     out.push_str("  }\n");
                 }
             }
             for e in &edges {
-                let label = edge_label(view, e).map(|l| format!(" [label=\"{}\"]", quoted(l))).unwrap_or_default();
+                let label = edge_label(view, e)
+                    .map(|l| format!(" [label=\"{}\"]", quoted(l)))
+                    .unwrap_or_default();
                 out.push_str(&format!("  {} -> {}{label};\n", ids[&e.from], ids[&e.to]));
             }
             out.push_str("}\n");
@@ -175,7 +208,9 @@ pub fn render(g: &Graph, view: &View, format: Format) -> String {
                 }
             }
             for e in &edges {
-                let label = edge_label(view, e).map(|l| format!(": \"{}\"", quoted(l))).unwrap_or_default();
+                let label = edge_label(view, e)
+                    .map(|l| format!(": \"{}\"", quoted(l)))
+                    .unwrap_or_default();
                 out.push_str(&format!("{} -> {}{label}\n", path[&e.from], path[&e.to]));
             }
         }
@@ -185,11 +220,16 @@ pub fn render(g: &Graph, view: &View, format: Format) -> String {
 
 /// Mermaid labels are quoted; quotes and brackets become entity codes.
 fn mermaid_text(s: &str) -> String {
-    s.replace('"', "#quot;").replace('<', "#lt;").replace('>', "#gt;").replace('\n', " ")
+    s.replace('"', "#quot;")
+        .replace('<', "#lt;")
+        .replace('>', "#gt;")
+        .replace('\n', " ")
 }
 
 fn quoted(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ")
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', " ")
 }
 
 #[cfg(test)]
@@ -200,24 +240,68 @@ mod tests {
     #[test]
     fn renders_mermaid_dot_and_d2() {
         let (g, ids) = stack();
-        let m = render(&g, &View { edge_labels: true, ..View::default() }, Format::Mermaid);
+        let m = render(
+            &g,
+            &View {
+                edge_labels: true,
+                ..View::default()
+            },
+            Format::Mermaid,
+        );
         assert!(m.starts_with("flowchart LR\n"));
         assert!(m.contains("[\"api\"]") && m.contains("-->|calls|"), "{m}");
 
-        let grouped = View { group_by: Some("type".into()), direction: Direction::TB, edge_labels: true, ..View::default() };
+        let grouped = View {
+            group_by: Some("type".into()),
+            direction: Direction::TB,
+            edge_labels: true,
+            ..View::default()
+        };
         let m = render(&g, &grouped, Format::Mermaid);
-        assert!(m.contains("subgraph") && m.contains("[\"service\"]") && m.starts_with("flowchart TB"), "{m}");
+        assert!(
+            m.contains("subgraph") && m.contains("[\"service\"]") && m.starts_with("flowchart TB"),
+            "{m}"
+        );
 
-        let only_calls = View { edge_types: Some(vec!["calls".into()]), types: Some(vec!["service".into(), "store".into()]), edge_labels: false, ..View::default() };
+        let only_calls = View {
+            edge_types: Some(vec!["calls".into()]),
+            types: Some(vec!["service".into(), "store".into()]),
+            edge_labels: false,
+            ..View::default()
+        };
         let dot = render(&g, &only_calls, Format::Dot);
-        assert!(dot.starts_with("digraph \"Stack\"") && !dot.contains("hub") && dot.matches("->").count() == 3, "{dot}");
+        assert!(
+            dot.starts_with("digraph \"Stack\"")
+                && !dot.contains("hub")
+                && dot.matches("->").count() == 3,
+            "{dot}"
+        );
 
-        let focus = View { focus: Some(ids["db"]), depth: Some(1), edge_labels: true, ..View::default() };
+        let focus = View {
+            focus: Some(ids["db"]),
+            depth: Some(1),
+            edge_labels: true,
+            ..View::default()
+        };
         let d2 = render(&g, &focus, Format::D2);
-        assert!(d2.contains("\"api\"") && d2.contains("\"worker\"") && !d2.contains("\"web\""), "one step from db: {d2}");
+        assert!(
+            d2.contains("\"api\"") && d2.contains("\"worker\"") && !d2.contains("\"web\""),
+            "one step from db: {d2}"
+        );
 
-        let d2 = render(&g, &View { group_by: Some("lang".into()), edge_labels: true, ..View::default() }, Format::D2);
-        assert!(d2.contains("g") && d2.contains(".n"), "edges address nodes inside containers: {d2}");
+        let d2 = render(
+            &g,
+            &View {
+                group_by: Some("lang".into()),
+                edge_labels: true,
+                ..View::default()
+            },
+            Format::D2,
+        );
+        assert!(
+            d2.contains("g") && d2.contains(".n"),
+            "edges address nodes inside containers: {d2}"
+        );
         assert_eq!(mermaid_text("a \"b\" <c>"), "a #quot;b#quot; #lt;c#gt;");
     }
 }

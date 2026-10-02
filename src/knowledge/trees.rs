@@ -109,37 +109,86 @@ pub struct NewNode {
 #[serde(tag = "type")]
 pub enum TreeOp {
     #[serde(rename = "tree.create")]
-    Create { id: TreeId, name: String, purpose: String },
+    Create {
+        id: TreeId,
+        name: String,
+        purpose: String,
+    },
     #[serde(rename = "tree.rename")]
     RenameTree { id: TreeId, name: String },
     /// Adds under `parent` (a root when `None`), at `index` or the end.
     #[serde(rename = "node.add")]
-    Add { tree: TreeId, parent: Option<NodeId>, node: NewNode, index: Option<usize> },
+    Add {
+        tree: TreeId,
+        parent: Option<NodeId>,
+        node: NewNode,
+        index: Option<usize>,
+    },
     #[serde(rename = "node.rename")]
-    Rename { tree: TreeId, id: NodeId, name: String },
+    Rename {
+        tree: TreeId,
+        id: NodeId,
+        name: String,
+    },
     #[serde(rename = "node.describe")]
-    Describe { tree: TreeId, id: NodeId, text: Option<String> },
+    Describe {
+        tree: TreeId,
+        id: NodeId,
+        text: Option<String>,
+    },
     #[serde(rename = "node.kind")]
-    SetKind { tree: TreeId, id: NodeId, kind: NodeKind },
+    SetKind {
+        tree: TreeId,
+        id: NodeId,
+        kind: NodeKind,
+    },
     #[serde(rename = "node.move")]
-    Move { tree: TreeId, id: NodeId, parent: Option<NodeId>, index: Option<usize> },
+    Move {
+        tree: TreeId,
+        id: NodeId,
+        parent: Option<NodeId>,
+        index: Option<usize>,
+    },
     /// Replaces a node with new siblings; the original is retired. Its
     /// children stay with it unless moved in the same batch.
     #[serde(rename = "node.split")]
-    Split { tree: TreeId, id: NodeId, parts: Vec<NewNode>, reason: String },
+    Split {
+        tree: TreeId,
+        id: NodeId,
+        parts: Vec<NewNode>,
+        reason: String,
+    },
     /// Replaces several siblings with one new node, which receives all their
     /// active children; the originals are retired.
     #[serde(rename = "node.merge")]
-    Merge { tree: TreeId, ids: Vec<NodeId>, into: NewNode, reason: String },
+    Merge {
+        tree: TreeId,
+        ids: Vec<NodeId>,
+        into: NewNode,
+        reason: String,
+    },
     /// Retires a node (and keeps it). Active children must be moved or retired first.
     #[serde(rename = "node.retire")]
-    Retire { tree: TreeId, id: NodeId, reason: String },
+    Retire {
+        tree: TreeId,
+        id: NodeId,
+        reason: String,
+    },
     #[serde(rename = "node.restore")]
     Restore { tree: TreeId, id: NodeId },
     #[serde(rename = "node.attr.set")]
-    SetAttr { tree: TreeId, id: NodeId, name: String, def: AttrDef },
+    SetAttr {
+        tree: TreeId,
+        id: NodeId,
+        name: String,
+        def: AttrDef,
+    },
     #[serde(rename = "node.attr.remove")]
-    RemoveAttr { tree: TreeId, id: NodeId, name: String },
+    RemoveAttr {
+        tree: TreeId,
+        id: NodeId,
+        name: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -154,7 +203,11 @@ impl Trees {
             if self.trees.contains_key(id) {
                 return invalid(format!("tree {id} already exists"));
             }
-            let tree = Tree::new(*id, &text(name, "tree name")?, &text(purpose, "tree purpose")?.to_lowercase());
+            let tree = Tree::new(
+                *id,
+                &text(name, "tree name")?,
+                &text(purpose, "tree purpose")?.to_lowercase(),
+            );
             self.trees.insert(*id, tree);
             return Ok(());
         }
@@ -173,7 +226,10 @@ impl Trees {
             | TreeOp::SetAttr { tree, .. }
             | TreeOp::RemoveAttr { tree, .. } => tree,
         };
-        let tree = self.trees.get_mut(tree_id).ok_or_else(|| Error::NotFound(format!("tree {tree_id}")))?;
+        let tree = self
+            .trees
+            .get_mut(tree_id)
+            .ok_or_else(|| Error::NotFound(format!("tree {tree_id}")))?;
         tree.apply(op)
     }
 }
@@ -181,7 +237,12 @@ impl Trees {
 impl Tree {
     /// An empty tree (for owners that manage a single tree directly, like Tend).
     pub fn new(id: TreeId, name: &str, purpose: &str) -> Self {
-        Tree { id, name: name.to_string(), purpose: purpose.to_string(), nodes: Forest::new() }
+        Tree {
+            id,
+            name: name.to_string(),
+            purpose: purpose.to_string(),
+            nodes: Forest::new(),
+        }
     }
 
     // ---- reading ----
@@ -243,7 +304,11 @@ impl Tree {
         if !self.contains(id) {
             return Err(Error::NotFound(format!("node {id}")));
         }
-        let mut out: Vec<String> = self.nodes.lineage(id).map(|(_, n)| n.name.clone()).collect();
+        let mut out: Vec<String> = self
+            .nodes
+            .lineage(id)
+            .map(|(_, n)| n.name.clone())
+            .collect();
         out.reverse();
         Ok(out)
     }
@@ -274,7 +339,12 @@ impl Tree {
                 }
                 self.name = name;
             }
-            TreeOp::Add { parent, node, index, .. } => self.add(*parent, node, *index)?,
+            TreeOp::Add {
+                parent,
+                node,
+                index,
+                ..
+            } => self.add(*parent, node, *index)?,
             TreeOp::Rename { id, name, .. } => {
                 let name = text(name, "node name")?;
                 if self.require(id)?.name == name {
@@ -284,7 +354,10 @@ impl Tree {
                 self.node_mut(id)?.name = name;
             }
             TreeOp::Describe { id, text: t, .. } => {
-                let t = t.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+                let t = t
+                    .as_ref()
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty());
                 let node = self.node_mut(id)?;
                 if node.description == t {
                     return invalid("node.describe does not change anything");
@@ -301,8 +374,12 @@ impl Tree {
                 }
                 self.node_mut(id)?.kind = *kind;
             }
-            TreeOp::Move { id, parent, index, .. } => self.move_node(*id, *parent, *index)?,
-            TreeOp::Split { id, parts, reason, .. } => {
+            TreeOp::Move {
+                id, parent, index, ..
+            } => self.move_node(*id, *parent, *index)?,
+            TreeOp::Split {
+                id, parts, reason, ..
+            } => {
                 let reason = text(reason, "reason")?;
                 if parts.len() < 2 {
                     return invalid("a split needs at least two parts");
@@ -316,7 +393,9 @@ impl Tree {
                 }
                 self.retire(*id, reason, parts.iter().map(|p| p.id).collect(), true)?;
             }
-            TreeOp::Merge { ids, into, reason, .. } => {
+            TreeOp::Merge {
+                ids, into, reason, ..
+            } => {
                 let reason = text(reason, "reason")?;
                 if ids.len() < 2 || ids.iter().collect::<BTreeSet<_>>().len() != ids.len() {
                     return invalid("a merge needs at least two distinct nodes");
@@ -351,7 +430,8 @@ impl Tree {
                 }
                 let (parent, name) = (self.parent(id), node.name.clone());
                 if let Some(p) = parent {
-                    self.active(&p).map_err(|_| Error::Invalid("restore the parent first".into()))?;
+                    self.active(&p)
+                        .map_err(|_| Error::Invalid("restore the parent first".into()))?;
                 }
                 self.check_unique(parent, &name, Some(*id))?;
                 self.node_mut(id)?.retired = None;
@@ -359,8 +439,12 @@ impl Tree {
             TreeOp::SetAttr { id, name, def, .. } => {
                 let name = text(name, "attribute name")?.to_lowercase();
                 validate_attr(def)?;
-                if self.inherited_attrs(id)?.contains_key(&name) && !self.require(id)?.attrs.contains_key(&name) {
-                    return invalid(format!("attribute '{name}' is already defined by an ancestor"));
+                if self.inherited_attrs(id)?.contains_key(&name)
+                    && !self.require(id)?.attrs.contains_key(&name)
+                {
+                    return invalid(format!(
+                        "attribute '{name}' is already defined by an ancestor"
+                    ));
                 }
                 let node = self.node_mut(id)?;
                 if node.attrs.get(&name) == Some(def) {
@@ -381,16 +465,33 @@ impl Tree {
     fn add(&mut self, parent: Option<NodeId>, new: &NewNode, index: Option<usize>) -> Result<()> {
         let name = text(&new.name, "node name")?;
         self.check_unique(parent, &name, None)?;
-        self.add_unchecked_name(parent, &NewNode { name, ..new.clone() }, index, &[])
+        self.add_unchecked_name(
+            parent,
+            &NewNode {
+                name,
+                ..new.clone()
+            },
+            index,
+            &[],
+        )
     }
 
     /// Adds a node, checking names only against siblings not in `ignore`.
-    fn add_unchecked_name(&mut self, parent: Option<NodeId>, new: &NewNode, index: Option<usize>, ignore: &[NodeId]) -> Result<()> {
+    fn add_unchecked_name(
+        &mut self,
+        parent: Option<NodeId>,
+        new: &NewNode,
+        index: Option<usize>,
+        ignore: &[NodeId],
+    ) -> Result<()> {
         if self.nodes.contains(&new.id) {
             return invalid(format!("node {} already exists", new.id));
         }
         let name = text(&new.name, "node name")?;
-        let clash = self.nodes.siblings(parent.as_ref()).any(|s| !ignore.contains(&s) && self.same_name_active(&s, &name));
+        let clash = self
+            .nodes
+            .siblings(parent.as_ref())
+            .any(|s| !ignore.contains(&s) && self.same_name_active(&s, &name));
         if clash {
             return invalid(format!("a sibling is already named '{name}'"));
         }
@@ -399,11 +500,23 @@ impl Tree {
                 return invalid("leaves can't have children");
             }
         }
-        let node = Node { id: new.id, name, kind: new.kind, description: None, attrs: BTreeMap::new(), retired: None };
+        let node = Node {
+            id: new.id,
+            name,
+            kind: new.kind,
+            description: None,
+            attrs: BTreeMap::new(),
+            retired: None,
+        };
         self.nodes.insert(new.id, parent, index, node)
     }
 
-    fn move_node(&mut self, id: NodeId, parent: Option<NodeId>, index: Option<usize>) -> Result<()> {
+    fn move_node(
+        &mut self,
+        id: NodeId,
+        parent: Option<NodeId>,
+        index: Option<usize>,
+    ) -> Result<()> {
         let name = self.active(&id)?.name.clone();
         let old_parent = self.parent(&id);
         if let Some(p) = parent {
@@ -423,21 +536,40 @@ impl Tree {
         Ok(())
     }
 
-    fn retire(&mut self, id: NodeId, reason: String, replaced_by: Vec<NodeId>, keep_children: bool) -> Result<()> {
+    fn retire(
+        &mut self,
+        id: NodeId,
+        reason: String,
+        replaced_by: Vec<NodeId>,
+        keep_children: bool,
+    ) -> Result<()> {
         self.active(&id)?;
         if !keep_children && self.active_children(&id).next().is_some() {
             return invalid("move or retire this node's active children first");
         }
-        self.node_mut(&id)?.retired = Some(Retired { reason, replaced_by });
+        self.node_mut(&id)?.retired = Some(Retired {
+            reason,
+            replaced_by,
+        });
         Ok(())
     }
 
     fn same_name_active(&self, id: &NodeId, name: &str) -> bool {
-        self.nodes.get(id).is_some_and(|n| n.retired.is_none() && n.name.eq_ignore_ascii_case(name))
+        self.nodes
+            .get(id)
+            .is_some_and(|n| n.retired.is_none() && n.name.eq_ignore_ascii_case(name))
     }
 
-    fn check_unique(&self, parent: Option<NodeId>, name: &str, except: Option<NodeId>) -> Result<()> {
-        let clash = self.nodes.siblings(parent.as_ref()).any(|s| Some(s) != except && self.same_name_active(&s, name));
+    fn check_unique(
+        &self,
+        parent: Option<NodeId>,
+        name: &str,
+        except: Option<NodeId>,
+    ) -> Result<()> {
+        let clash = self
+            .nodes
+            .siblings(parent.as_ref())
+            .any(|s| Some(s) != except && self.same_name_active(&s, name));
         if clash {
             return invalid(format!("a sibling is already named '{name}'"));
         }
@@ -445,15 +577,21 @@ impl Tree {
     }
 
     fn position(&self, id: &NodeId) -> Result<usize> {
-        self.nodes.position(id).ok_or_else(|| Error::NotFound(format!("node {id}")))
+        self.nodes
+            .position(id)
+            .ok_or_else(|| Error::NotFound(format!("node {id}")))
     }
 
     fn require(&self, id: &NodeId) -> Result<&Node> {
-        self.nodes.get(id).ok_or_else(|| Error::NotFound(format!("node {id}")))
+        self.nodes
+            .get(id)
+            .ok_or_else(|| Error::NotFound(format!("node {id}")))
     }
 
     fn node_mut(&mut self, id: &NodeId) -> Result<&mut Node> {
-        self.nodes.get_mut(id).ok_or_else(|| Error::NotFound(format!("node {id}")))
+        self.nodes
+            .get_mut(id)
+            .ok_or_else(|| Error::NotFound(format!("node {id}")))
     }
 
     fn active(&self, id: &NodeId) -> Result<&Node> {
@@ -493,15 +631,28 @@ impl Tree {
     /// Rebuilds a tree from its written-out form, checking that parents and children agree.
     pub fn from_json(j: TreeJson) -> Result<Tree> {
         let mut tree = Tree::new(j.id, &j.name, &j.purpose);
-        let mut queue: std::collections::VecDeque<(NodeId, Option<NodeId>)> = j.roots.iter().map(|r| (*r, None)).collect();
+        let mut queue: std::collections::VecDeque<(NodeId, Option<NodeId>)> =
+            j.roots.iter().map(|r| (*r, None)).collect();
         let mut nodes = j.nodes;
         while let Some((id, parent)) = queue.pop_front() {
-            let n = nodes.remove(&id).ok_or_else(|| Error::Invalid(format!("node {id} is listed but missing (or listed twice)")))?;
+            let n = nodes.remove(&id).ok_or_else(|| {
+                Error::Invalid(format!("node {id} is listed but missing (or listed twice)"))
+            })?;
             if n.parent != parent {
-                return invalid(format!("node {id} says its parent is {:?}, but it's listed under {:?}", n.parent, parent));
+                return invalid(format!(
+                    "node {id} says its parent is {:?}, but it's listed under {:?}",
+                    n.parent, parent
+                ));
             }
             queue.extend(n.children.iter().map(|c| (*c, Some(id))));
-            let node = Node { id, name: n.name, kind: n.kind, description: n.description, attrs: n.attrs, retired: n.retired };
+            let node = Node {
+                id,
+                name: n.name,
+                kind: n.kind,
+                description: n.description,
+                attrs: n.attrs,
+                retired: n.retired,
+            };
             tree.nodes.insert(id, parent, None, node)?;
         }
         if let Some(stray) = nodes.keys().next() {
@@ -563,7 +714,14 @@ impl Serialize for Tree {
             roots: Ids<'a>,
             nodes: NodesOut<'a>,
         }
-        TreeOut { id: &self.id, name: &self.name, purpose: &self.purpose, roots: Ids(self.roots()), nodes: NodesOut(self) }.serialize(s)
+        TreeOut {
+            id: &self.id,
+            name: &self.name,
+            purpose: &self.purpose,
+            roots: Ids(self.roots()),
+            nodes: NodesOut(self),
+        }
+        .serialize(s)
     }
 }
 
@@ -587,12 +745,28 @@ mod tests {
         fn new() -> Self {
             let mut trees = Trees::default();
             let tree = Uuid::now_v7();
-            trees.apply(&TreeOp::Create { id: tree, name: "Wardrobe".into(), purpose: "catalog".into() }).unwrap();
+            trees
+                .apply(&TreeOp::Create {
+                    id: tree,
+                    name: "Wardrobe".into(),
+                    purpose: "catalog".into(),
+                })
+                .unwrap();
             T { trees, tree }
         }
         fn add(&mut self, parent: Option<NodeId>, name: &str, kind: NodeKind) -> NodeId {
             let id = Uuid::now_v7();
-            self.op(TreeOp::Add { tree: self.tree, parent, node: NewNode { id, name: name.into(), kind }, index: None }).unwrap();
+            self.op(TreeOp::Add {
+                tree: self.tree,
+                parent,
+                node: NewNode {
+                    id,
+                    name: name.into(),
+                    kind,
+                },
+                index: None,
+            })
+            .unwrap();
             id
         }
         fn op(&mut self, op: TreeOp) -> Result<()> {
@@ -603,7 +777,15 @@ mod tests {
         }
         fn names(&self, parent: Option<NodeId>) -> Vec<(String, bool)> {
             let t = self.t();
-            t.forest().siblings(parent.as_ref()).map(|c| (t.node(&c).unwrap().name.clone(), t.node(&c).unwrap().retired.is_some())).collect()
+            t.forest()
+                .siblings(parent.as_ref())
+                .map(|c| {
+                    (
+                        t.node(&c).unwrap().name.clone(),
+                        t.node(&c).unwrap().retired.is_some(),
+                    )
+                })
+                .collect()
         }
     }
 
@@ -614,21 +796,85 @@ mod tests {
         let lower = t.add(Some(clothing), "Lower-wear", NodeKind::Category);
         let jeans = t.add(Some(lower), "Jeans", NodeKind::Category);
         let loose = t.add(Some(jeans), "Loose", NodeKind::Specifier);
-        assert_eq!(t.t().path(&loose).unwrap(), ["Clothing", "Lower-wear", "Jeans", "Loose"]);
+        assert_eq!(
+            t.t().path(&loose).unwrap(),
+            ["Clothing", "Lower-wear", "Jeans", "Loose"]
+        );
 
-        assert!(t.op(TreeOp::Move { tree: t.tree, id: lower, parent: Some(loose), index: None }).is_err(), "no cycles");
+        assert!(
+            t.op(TreeOp::Move {
+                tree: t.tree,
+                id: lower,
+                parent: Some(loose),
+                index: None
+            })
+            .is_err(),
+            "no cycles"
+        );
         let dup = Uuid::now_v7();
-        let clash = TreeOp::Add { tree: t.tree, parent: Some(jeans), node: NewNode { id: dup, name: "loose".into(), kind: NodeKind::Specifier }, index: None };
-        assert!(t.op(clash).is_err(), "sibling names are unique, ignoring case");
+        let clash = TreeOp::Add {
+            tree: t.tree,
+            parent: Some(jeans),
+            node: NewNode {
+                id: dup,
+                name: "loose".into(),
+                kind: NodeKind::Specifier,
+            },
+            index: None,
+        };
+        assert!(
+            t.op(clash).is_err(),
+            "sibling names are unique, ignoring case"
+        );
 
         let leaf = t.add(Some(clothing), "Scarf", NodeKind::Leaf);
-        assert!(t.op(TreeOp::Move { tree: t.tree, id: jeans, parent: Some(leaf), index: None }).is_err(), "leaves have no children");
-        t.op(TreeOp::Move { tree: t.tree, id: jeans, parent: Some(clothing), index: Some(0) }).unwrap();
-        assert_eq!(t.names(Some(clothing)).iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), ["Jeans", "Lower-wear", "Scarf"]);
-        let missing = TreeOp::Add { tree: t.tree, parent: Some(Uuid::now_v7()), node: NewNode { id: Uuid::now_v7(), name: "x".into(), kind: NodeKind::Leaf }, index: None };
-        assert!(matches!(t.op(missing), Err(Error::NotFound(_))), "a missing parent is an error, not a panic");
+        assert!(
+            t.op(TreeOp::Move {
+                tree: t.tree,
+                id: jeans,
+                parent: Some(leaf),
+                index: None
+            })
+            .is_err(),
+            "leaves have no children"
+        );
+        t.op(TreeOp::Move {
+            tree: t.tree,
+            id: jeans,
+            parent: Some(clothing),
+            index: Some(0),
+        })
+        .unwrap();
+        assert_eq!(
+            t.names(Some(clothing))
+                .iter()
+                .map(|x| x.0.as_str())
+                .collect::<Vec<_>>(),
+            ["Jeans", "Lower-wear", "Scarf"]
+        );
+        let missing = TreeOp::Add {
+            tree: t.tree,
+            parent: Some(Uuid::now_v7()),
+            node: NewNode {
+                id: Uuid::now_v7(),
+                name: "x".into(),
+                kind: NodeKind::Leaf,
+            },
+            index: None,
+        };
+        assert!(
+            matches!(t.op(missing), Err(Error::NotFound(_))),
+            "a missing parent is an error, not a panic"
+        );
         let before = t.t().clone();
-        assert!(t.op(TreeOp::Move { tree: t.tree, id: jeans, parent: Some(lower), index: Some(9) }).is_err());
+        assert!(t
+            .op(TreeOp::Move {
+                tree: t.tree,
+                id: jeans,
+                parent: Some(lower),
+                index: Some(9)
+            })
+            .is_err());
         assert_eq!(t.t(), &before, "a failed move changes nothing");
     }
 
@@ -642,26 +888,92 @@ mod tests {
             tree: t.tree,
             id: login,
             parts: vec![
-                NewNode { id: pw, name: "Password login".into(), kind: NodeKind::Leaf },
-                NewNode { id: pk, name: "Passkey login".into(), kind: NodeKind::Leaf },
+                NewNode {
+                    id: pw,
+                    name: "Password login".into(),
+                    kind: NodeKind::Leaf,
+                },
+                NewNode {
+                    id: pk,
+                    name: "Passkey login".into(),
+                    kind: NodeKind::Leaf,
+                },
             ],
             reason: "passkeys need their own flow".into(),
         })
         .unwrap();
-        assert_eq!(t.names(Some(auth)), [("Login".into(), true), ("Password login".into(), false), ("Passkey login".into(), false)]);
-        assert_eq!(t.t().node(&login).unwrap().retired.as_ref().unwrap().replaced_by, vec![pw, pk]);
+        assert_eq!(
+            t.names(Some(auth)),
+            [
+                ("Login".into(), true),
+                ("Password login".into(), false),
+                ("Passkey login".into(), false)
+            ]
+        );
+        assert_eq!(
+            t.t()
+                .node(&login)
+                .unwrap()
+                .retired
+                .as_ref()
+                .unwrap()
+                .replaced_by,
+            vec![pw, pk]
+        );
 
         let merged = Uuid::now_v7();
-        t.op(TreeOp::Merge { tree: t.tree, ids: vec![pw, pk], into: NewNode { id: merged, name: "Login".into(), kind: NodeKind::Category }, reason: "one sign-in screen after all".into() })
-            .unwrap();
-        assert!(t.t().node(&pw).unwrap().retired.is_some() && t.t().node(&merged).unwrap().retired.is_none());
+        t.op(TreeOp::Merge {
+            tree: t.tree,
+            ids: vec![pw, pk],
+            into: NewNode {
+                id: merged,
+                name: "Login".into(),
+                kind: NodeKind::Category,
+            },
+            reason: "one sign-in screen after all".into(),
+        })
+        .unwrap();
+        assert!(
+            t.t().node(&pw).unwrap().retired.is_some()
+                && t.t().node(&merged).unwrap().retired.is_none()
+        );
 
-        assert!(t.op(TreeOp::Retire { tree: t.tree, id: auth, reason: "x".into() }).is_err(), "active children first");
-        t.op(TreeOp::Retire { tree: t.tree, id: merged, reason: "moved to SSO".into() }).unwrap();
-        t.op(TreeOp::Retire { tree: t.tree, id: auth, reason: "moved to SSO".into() }).unwrap();
+        assert!(
+            t.op(TreeOp::Retire {
+                tree: t.tree,
+                id: auth,
+                reason: "x".into()
+            })
+            .is_err(),
+            "active children first"
+        );
+        t.op(TreeOp::Retire {
+            tree: t.tree,
+            id: merged,
+            reason: "moved to SSO".into(),
+        })
+        .unwrap();
+        t.op(TreeOp::Retire {
+            tree: t.tree,
+            id: auth,
+            reason: "moved to SSO".into(),
+        })
+        .unwrap();
         assert_eq!(t.t().len(), 5, "nothing is ever deleted");
-        t.op(TreeOp::Restore { tree: t.tree, id: auth }).unwrap();
-        assert!(t.op(TreeOp::Retire { tree: t.tree, id: auth, reason: " ".into() }).is_err(), "a reason is required");
+        t.op(TreeOp::Restore {
+            tree: t.tree,
+            id: auth,
+        })
+        .unwrap();
+        assert!(
+            t.op(TreeOp::Retire {
+                tree: t.tree,
+                id: auth,
+                reason: " ".into()
+            })
+            .is_err(),
+            "a reason is required"
+        );
     }
 
     #[test]
@@ -669,15 +981,64 @@ mod tests {
         let mut t = T::new();
         let clothing = t.add(None, "Clothing", NodeKind::Category);
         let jeans = t.add(Some(clothing), "Jeans", NodeKind::Category);
-        let formality = AttrDef { ty: AttrType::Scale, options: vec![], unit: None, min: Some(1), max: Some(5), required: true };
-        t.op(TreeOp::SetAttr { tree: t.tree, id: clothing, name: "Formality".into(), def: formality.clone() }).unwrap();
-        let fit = AttrDef { ty: AttrType::Enum, options: vec!["slim".into(), "loose".into()], unit: None, min: None, max: None, required: false };
-        t.op(TreeOp::SetAttr { tree: t.tree, id: jeans, name: "fit".into(), def: fit }).unwrap();
+        let formality = AttrDef {
+            ty: AttrType::Scale,
+            options: vec![],
+            unit: None,
+            min: Some(1),
+            max: Some(5),
+            required: true,
+        };
+        t.op(TreeOp::SetAttr {
+            tree: t.tree,
+            id: clothing,
+            name: "Formality".into(),
+            def: formality.clone(),
+        })
+        .unwrap();
+        let fit = AttrDef {
+            ty: AttrType::Enum,
+            options: vec!["slim".into(), "loose".into()],
+            unit: None,
+            min: None,
+            max: None,
+            required: false,
+        };
+        t.op(TreeOp::SetAttr {
+            tree: t.tree,
+            id: jeans,
+            name: "fit".into(),
+            def: fit,
+        })
+        .unwrap();
         let attrs = t.t().inherited_attrs(&jeans).unwrap();
         assert_eq!(attrs.keys().collect::<Vec<_>>(), ["fit", "formality"]);
-        assert!(t.op(TreeOp::SetAttr { tree: t.tree, id: jeans, name: "formality".into(), def: formality }).is_err(), "no shadowing");
-        let bad = AttrDef { ty: AttrType::Enum, options: vec![], unit: None, min: None, max: None, required: false };
-        assert!(t.op(TreeOp::SetAttr { tree: t.tree, id: jeans, name: "wash".into(), def: bad }).is_err());
+        assert!(
+            t.op(TreeOp::SetAttr {
+                tree: t.tree,
+                id: jeans,
+                name: "formality".into(),
+                def: formality
+            })
+            .is_err(),
+            "no shadowing"
+        );
+        let bad = AttrDef {
+            ty: AttrType::Enum,
+            options: vec![],
+            unit: None,
+            min: None,
+            max: None,
+            required: false,
+        };
+        assert!(t
+            .op(TreeOp::SetAttr {
+                tree: t.tree,
+                id: jeans,
+                name: "wash".into(),
+                def: bad
+            })
+            .is_err());
     }
 
     #[test]
@@ -686,12 +1047,29 @@ mod tests {
         let clothing = t.add(None, "Clothing", NodeKind::Category);
         let jeans = t.add(Some(clothing), "Jeans", NodeKind::Category);
         t.add(Some(clothing), "Scarf", NodeKind::Leaf);
-        t.op(TreeOp::Describe { tree: t.tree, id: jeans, text: Some("denim".into()) }).unwrap();
+        t.op(TreeOp::Describe {
+            tree: t.tree,
+            id: jeans,
+            text: Some("denim".into()),
+        })
+        .unwrap();
         let tree = t.t().clone();
         let json = serde_json::to_value(&tree).unwrap();
-        assert_eq!(json, serde_json::to_value(tree.to_json()).unwrap(), "streamed and built forms agree");
-        assert_eq!(json["nodes"][jeans.to_string()]["parent"], serde_json::json!(clothing));
-        assert!(json["nodes"][clothing.to_string()].get("description").is_none(), "empty fields are left out");
+        assert_eq!(
+            json,
+            serde_json::to_value(tree.to_json()).unwrap(),
+            "streamed and built forms agree"
+        );
+        assert_eq!(
+            json["nodes"][jeans.to_string()]["parent"],
+            serde_json::json!(clothing)
+        );
+        assert!(
+            json["nodes"][clothing.to_string()]
+                .get("description")
+                .is_none(),
+            "empty fields are left out"
+        );
         let back: Tree = serde_json::from_value(json.clone()).unwrap();
         assert_eq!(back, tree);
         let mut broken = json;

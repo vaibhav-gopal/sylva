@@ -63,9 +63,22 @@ impl ChainLog {
     pub fn from_connection(conn: Connection) -> Result<Self> {
         conn.execute_batch(SCHEMA)?;
         let tip = conn
-            .query_row("SELECT seq, hash FROM ops ORDER BY seq DESC LIMIT 1", [], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
-            .map(|(seq, hash)| Tip { seq: seq as u64, head: Some(hash) })
-            .or_else(|e| if e == rusqlite::Error::QueryReturnedNoRows { Ok(Tip::default()) } else { Err(e) })?;
+            .query_row(
+                "SELECT seq, hash FROM ops ORDER BY seq DESC LIMIT 1",
+                [],
+                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)),
+            )
+            .map(|(seq, hash)| Tip {
+                seq: seq as u64,
+                head: Some(hash),
+            })
+            .or_else(|e| {
+                if e == rusqlite::Error::QueryReturnedNoRows {
+                    Ok(Tip::default())
+                } else {
+                    Err(e)
+                }
+            })?;
         Ok(ChainLog { conn, tip })
     }
 
@@ -82,7 +95,11 @@ impl ChainLog {
     }
 
     /// Every op with `seq > after`, in order. A row that doesn't decode is an integrity error.
-    pub fn read_since<A: DeserializeOwned, O>(&self, after: u64, codec: &impl Codec<O>) -> Result<Vec<Sealed<A, O>>> {
+    pub fn read_since<A: DeserializeOwned, O>(
+        &self,
+        after: u64,
+        codec: &impl Codec<O>,
+    ) -> Result<Vec<Sealed<A, O>>> {
         let mut stmt = self.conn.prepare("SELECT seq, id, batch, parent, ts, actor, op, hash FROM ops WHERE seq > ?1 ORDER BY seq")?;
         let rows = stmt.query_map([after as i64], |r| {
             Ok((
@@ -108,7 +125,9 @@ impl ChainLog {
                 parent,
                 ts,
                 actor: serde_json::from_str(&actor).map_err(|e| bad(format!("actor: {e}")))?,
-                op: codec.decode(&op, &hash).map_err(|e| bad(format!("op: {e}")))?,
+                op: codec
+                    .decode(&op, &hash)
+                    .map_err(|e| bad(format!("op: {e}")))?,
                 hash,
             });
         }
@@ -116,27 +135,56 @@ impl ChainLog {
     }
 
     /// Appends ops already sealed after the tip, in one transaction.
-    pub fn append<A: Serialize, O>(&mut self, sealed: &[Sealed<A, O>], codec: &impl Codec<O>) -> Result<()> {
-        let Some(first) = sealed.first() else { return Ok(()) };
+    pub fn append<A: Serialize, O>(
+        &mut self,
+        sealed: &[Sealed<A, O>],
+        codec: &impl Codec<O>,
+    ) -> Result<()> {
+        let Some(first) = sealed.first() else {
+            return Ok(());
+        };
         if first.seq != self.tip.seq + 1 || first.parent != self.tip.head {
-            return Err(Error::Invalid("these ops don't follow the chain's tip".into()));
+            return Err(Error::Invalid(
+                "these ops don't follow the chain's tip".into(),
+            ));
         }
-        let payloads = sealed.iter().map(|o| codec.encode(&o.op, &o.hash)).collect::<Result<Vec<_>>>()?;
+        let payloads = sealed
+            .iter()
+            .map(|o| codec.encode(&o.op, &o.hash))
+            .collect::<Result<Vec<_>>>()?;
         let tx = self.conn.transaction()?;
         {
             let mut insert = tx.prepare("INSERT INTO ops (seq, id, batch, parent, ts, actor, op, hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)")?;
             for (o, payload) in sealed.iter().zip(&payloads) {
-                insert.execute(params![o.seq as i64, o.id.to_string(), o.batch.to_string(), o.parent, o.ts, serde_json::to_string(&o.actor)?, payload, o.hash])?;
+                insert.execute(params![
+                    o.seq as i64,
+                    o.id.to_string(),
+                    o.batch.to_string(),
+                    o.parent,
+                    o.ts,
+                    serde_json::to_string(&o.actor)?,
+                    payload,
+                    o.hash
+                ])?;
             }
         }
         tx.commit()?;
         let last = sealed.last().expect("non-empty");
-        self.tip = Tip { seq: last.seq, head: Some(last.hash.clone()) };
+        self.tip = Tip {
+            seq: last.seq,
+            head: Some(last.hash.clone()),
+        };
         Ok(())
     }
 
     /// Seals `ops` as one batch after the tip and appends them.
-    pub fn commit<A: Serialize + Clone, O: Serialize>(&mut self, actor: &A, ops: Vec<O>, ts: i64, codec: &impl Codec<O>) -> Result<Vec<Sealed<A, O>>> {
+    pub fn commit<A: Serialize + Clone, O: Serialize>(
+        &mut self,
+        actor: &A,
+        ops: Vec<O>,
+        ts: i64,
+        codec: &impl Codec<O>,
+    ) -> Result<Vec<Sealed<A, O>>> {
         if ops.is_empty() {
             return Err(Error::Invalid("empty batch".into()));
         }
@@ -157,9 +205,13 @@ mod tests {
         let path = dir.path().join("log.db");
         {
             let mut log = ChainLog::open(&path).unwrap();
-            log.commit(&"user".to_string(), vec![1i64, 2], 10, &PlainJson).unwrap();
-            log.commit(&"user".to_string(), vec![3i64], 11, &PlainJson).unwrap();
-            assert!(log.commit(&"user".to_string(), Vec::<i64>::new(), 12, &PlainJson).is_err());
+            log.commit(&"user".to_string(), vec![1i64, 2], 10, &PlainJson)
+                .unwrap();
+            log.commit(&"user".to_string(), vec![3i64], 11, &PlainJson)
+                .unwrap();
+            assert!(log
+                .commit(&"user".to_string(), Vec::<i64>::new(), 12, &PlainJson)
+                .is_err());
         }
         let log = ChainLog::open(&path).unwrap();
         assert_eq!(log.tip().seq, 3);
@@ -171,8 +223,17 @@ mod tests {
         })
         .unwrap();
         assert_eq!((sum, &tip), (6, log.tip()));
-        log.conn().execute("UPDATE ops SET op = '30' WHERE seq = 3", []).unwrap();
+        log.conn()
+            .execute("UPDATE ops SET op = '30' WHERE seq = 3", [])
+            .unwrap();
         let tampered: Vec<Sealed<String, i64>> = log.read_since(0, &PlainJson).unwrap();
-        assert!(matches!(replay(&tampered, u64::MAX, |_| -> std::result::Result<(), String> { Ok(()) }), Err(Error::Integrity { seq: 3, .. })));
+        assert!(matches!(
+            replay(
+                &tampered,
+                u64::MAX,
+                |_| -> std::result::Result<(), String> { Ok(()) }
+            ),
+            Err(Error::Integrity { seq: 3, .. })
+        ));
     }
 }

@@ -80,14 +80,32 @@ pub fn check_value(name: &str, def: &AttrDef, v: &serde_json::Value) -> Result<(
         },
         AttrType::Scale => match v.as_i64() {
             Some(n) if def.min.is_none_or(|m| n >= m) && def.max.is_none_or(|m| n <= m) => Ok(()),
-            _ => bad(&format!("an integer from {} to {}", def.min.unwrap_or(i64::MIN), def.max.unwrap_or(i64::MAX))),
+            _ => bad(&format!(
+                "an integer from {} to {}",
+                def.min.unwrap_or(i64::MIN),
+                def.max.unwrap_or(i64::MAX)
+            )),
         },
         AttrType::Date => match v.as_str() {
-            Some(s) if s.len() == 10 && s.as_bytes()[4] == b'-' && s.as_bytes()[7] == b'-' && s.chars().filter(char::is_ascii_digit).count() == 8 => Ok(()),
+            Some(s)
+                if s.len() == 10
+                    && s.as_bytes()[4] == b'-'
+                    && s.as_bytes()[7] == b'-'
+                    && s.chars().filter(char::is_ascii_digit).count() == 8 =>
+            {
+                Ok(())
+            }
             _ => bad("a date (YYYY-MM-DD)"),
         },
         AttrType::Money => match v {
-            Value::Object(m) if m.get("amount").is_some_and(Value::is_i64) && m.get("currency").and_then(Value::as_str).is_some_and(|c| c.len() == 3) => Ok(()),
+            Value::Object(m)
+                if m.get("amount").is_some_and(Value::is_i64)
+                    && m.get("currency")
+                        .and_then(Value::as_str)
+                        .is_some_and(|c| c.len() == 3) =>
+            {
+                Ok(())
+            }
             _ => bad("money ({\"amount\": minor units, \"currency\": \"CAD\"})"),
         },
         AttrType::Ref => match v.as_str().map(str::parse::<EntityRef>) {

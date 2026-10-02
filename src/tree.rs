@@ -27,7 +27,12 @@ pub struct Tree<T, K: Key = uuid::Uuid> {
 
 impl<T, K: Key> Default for Tree<T, K> {
     fn default() -> Self {
-        Tree { slots: Vec::new(), free: Vec::new(), index: BTreeMap::new(), roots: Vec::new() }
+        Tree {
+            slots: Vec::new(),
+            free: Vec::new(),
+            index: BTreeMap::new(),
+            roots: Vec::new(),
+        }
     }
 }
 
@@ -39,7 +44,10 @@ pub struct Keys<'t, T, K: Key> {
 
 impl<T, K: Key> Clone for Keys<'_, T, K> {
     fn clone(&self) -> Self {
-        Keys { tree: self.tree, list: self.list.clone() }
+        Keys {
+            tree: self.tree,
+            list: self.list.clone(),
+        }
     }
 }
 
@@ -121,15 +129,22 @@ impl<T, K: Key> Tree<T, K> {
     }
 
     fn s(&self, i: u32) -> &Slot<T, K> {
-        self.slots[i as usize].as_ref().expect("indexed slots are live")
+        self.slots[i as usize]
+            .as_ref()
+            .expect("indexed slots are live")
     }
 
     fn s_mut(&mut self, i: u32) -> &mut Slot<T, K> {
-        self.slots[i as usize].as_mut().expect("indexed slots are live")
+        self.slots[i as usize]
+            .as_mut()
+            .expect("indexed slots are live")
     }
 
     fn ix(&self, key: &K) -> Result<u32> {
-        self.index.get(key).copied().ok_or_else(|| Error::NotFound(format!("node {key}")))
+        self.index
+            .get(key)
+            .copied()
+            .ok_or_else(|| Error::NotFound(format!("node {key}")))
     }
 
     fn list(&self, parent: Option<u32>) -> &Vec<u32> {
@@ -162,7 +177,10 @@ impl<T, K: Key> Tree<T, K> {
     }
 
     pub fn roots(&self) -> Keys<'_, T, K> {
-        Keys { tree: self, list: self.roots.iter() }
+        Keys {
+            tree: self,
+            list: self.roots.iter(),
+        }
     }
 
     /// The node's children, in order (none for a key that isn't here).
@@ -171,7 +189,10 @@ impl<T, K: Key> Tree<T, K> {
             Some(&i) => &self.s(i).children,
             None => &[],
         };
-        Keys { tree: self, list: list.iter() }
+        Keys {
+            tree: self,
+            list: list.iter(),
+        }
     }
 
     /// The children of `parent`, or the roots for `None`.
@@ -193,7 +214,13 @@ impl<T, K: Key> Tree<T, K> {
     }
 
     /// Adds a node under `parent` (a root for `None`) at `index`, or last.
-    pub fn insert(&mut self, key: K, parent: Option<K>, index: Option<usize>, data: T) -> Result<()> {
+    pub fn insert(
+        &mut self,
+        key: K,
+        parent: Option<K>,
+        index: Option<usize>,
+        data: T,
+    ) -> Result<()> {
         if self.index.contains_key(&key) {
             return invalid(format!("node {key} already exists"));
         }
@@ -203,7 +230,12 @@ impl<T, K: Key> Tree<T, K> {
         if at > len {
             return invalid("index out of range");
         }
-        let slot = Slot { key, data, parent: p, children: Vec::new() };
+        let slot = Slot {
+            key,
+            data,
+            parent: p,
+            children: Vec::new(),
+        };
         let i = match self.free.pop() {
             Some(i) => {
                 self.slots[i as usize] = Some(slot);
@@ -230,13 +262,21 @@ impl<T, K: Key> Tree<T, K> {
             }
         }
         let old = self.s(i).parent;
-        let from = self.list(old).iter().position(|&x| x == i).expect("a node is in its parent's list");
+        let from = self
+            .list(old)
+            .iter()
+            .position(|&x| x == i)
+            .expect("a node is in its parent's list");
         self.list_mut(old).remove(from);
         let len = self.list(p).len();
         let at = index.unwrap_or(len);
         if at > len || (old == p && at == from) {
             self.list_mut(old).insert(from, i);
-            return if at > len { invalid("index out of range") } else { Ok(false) };
+            return if at > len {
+                invalid("index out of range")
+            } else {
+                Ok(false)
+            };
         }
         self.list_mut(p).insert(at, i);
         self.s_mut(i).parent = p;
@@ -251,7 +291,9 @@ impl<T, K: Key> Tree<T, K> {
         let mut out = Vec::new();
         let mut stack = vec![i];
         while let Some(n) = stack.pop() {
-            let s = self.slots[n as usize].take().expect("indexed slots are live");
+            let s = self.slots[n as usize]
+                .take()
+                .expect("indexed slots are live");
             self.index.remove(&s.key);
             self.free.push(n);
             stack.extend(s.children.iter().rev());
@@ -281,12 +323,18 @@ impl<T, K: Key> Tree<T, K> {
 
     /// The node, then its parent, and so on up to its root.
     pub fn lineage(&self, key: &K) -> Lineage<'_, T, K> {
-        Lineage { tree: self, next: self.index.get(key).copied() }
+        Lineage {
+            tree: self,
+            next: self.index.get(key).copied(),
+        }
     }
 
     /// Its parent, grandparent … (not the node itself).
     pub fn ancestors(&self, key: &K) -> Lineage<'_, T, K> {
-        Lineage { tree: self, next: self.index.get(key).and_then(|&i| self.s(i).parent) }
+        Lineage {
+            tree: self,
+            next: self.index.get(key).and_then(|&i| self.s(i).parent),
+        }
     }
 
     /// Steps from its root (a root has depth 0).
@@ -301,13 +349,27 @@ impl<T, K: Key> Tree<T, K> {
 
     /// `key` and its subtree in preorder, skipping (with their subtrees) the nodes `keep` rejects.
     pub fn subtree<F: FnMut(&K, &T) -> bool>(&self, key: &K, keep: F) -> Preorder<'_, T, K, F> {
-        Preorder { tree: self, stack: self.index.get(key).copied().into_iter().collect(), keep }
+        Preorder {
+            tree: self,
+            stack: self.index.get(key).copied().into_iter().collect(),
+            keep,
+        }
     }
 
     /// Every tree of the forest in preorder, roots in order.
     pub fn preorder<F: FnMut(&K, &T) -> bool>(&self, mut keep: F) -> Preorder<'_, T, K, F> {
-        let stack = self.roots.iter().rev().copied().filter(|&r| keep(&self.s(r).key, &self.s(r).data)).collect();
-        Preorder { tree: self, stack, keep }
+        let stack = self
+            .roots
+            .iter()
+            .rev()
+            .copied()
+            .filter(|&r| keep(&self.s(r).key, &self.s(r).data))
+            .collect();
+        Preorder {
+            tree: self,
+            stack,
+            keep,
+        }
     }
 
     /// Every node, in key order.
@@ -325,7 +387,10 @@ impl<T: PartialEq, K: Key> PartialEq for Tree<T, K> {
         self.len() == other.len()
             && self.roots().eq(other.roots())
             && self.iter().zip(other.iter()).all(|((ka, a), (kb, b))| {
-                ka == kb && a == b && self.parent(&ka) == other.parent(&kb) && self.children(&ka).eq(other.children(&kb))
+                ka == kb
+                    && a == b
+                    && self.parent(&ka) == other.parent(&kb)
+                    && self.children(&ka).eq(other.children(&kb))
             })
     }
 }
@@ -348,16 +413,39 @@ mod tests {
     #[test]
     fn builds_walks_and_paths() {
         let t = wardrobe();
-        let path: Vec<&str> = t.lineage(&4).map(|(_, n)| *n).collect::<Vec<_>>().into_iter().rev().collect();
+        let path: Vec<&str> = t
+            .lineage(&4)
+            .map(|(_, n)| *n)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
         assert_eq!(path, ["Clothing", "Lower-wear", "Jeans", "Loose"]);
         assert_eq!(t.depth(&4), Some(3));
         assert_eq!(t.root_of(&4), Some(1));
         assert_eq!(t.children(&1).collect::<Vec<_>>(), [2, 5]);
-        assert_eq!(t.subtree(&1, |_, _| true).map(|(k, _)| k).collect::<Vec<_>>(), [1, 2, 3, 4, 5]);
-        assert_eq!(t.subtree(&1, |k, _| *k != 3).map(|(k, _)| k).collect::<Vec<_>>(), [1, 2, 5], "skips 3 and below");
+        assert_eq!(
+            t.subtree(&1, |_, _| true)
+                .map(|(k, _)| k)
+                .collect::<Vec<_>>(),
+            [1, 2, 3, 4, 5]
+        );
+        assert_eq!(
+            t.subtree(&1, |k, _| *k != 3)
+                .map(|(k, _)| k)
+                .collect::<Vec<_>>(),
+            [1, 2, 5],
+            "skips 3 and below"
+        );
         assert!(t.is_ancestor(&1, &4) && !t.is_ancestor(&4, &1) && !t.is_ancestor(&4, &4));
-        assert!(matches!(t.clone().insert(9, Some(42), None, "x"), Err(Error::NotFound(_))));
-        assert!(t.clone().insert(9, Some(1), Some(3), "x").is_err(), "index out of range");
+        assert!(matches!(
+            t.clone().insert(9, Some(42), None, "x"),
+            Err(Error::NotFound(_))
+        ));
+        assert!(
+            t.clone().insert(9, Some(1), Some(3), "x").is_err(),
+            "index out of range"
+        );
     }
 
     #[test]
@@ -370,7 +458,11 @@ mod tests {
         assert_eq!(t.children(&1).collect::<Vec<_>>(), [3, 2, 5]);
         assert_eq!(t.parent(&3), Some(1));
         assert!(t.move_to(&3, None, Some(7)).is_err());
-        assert_eq!(t.children(&1).collect::<Vec<_>>(), [3, 2, 5], "a failed move changes nothing");
+        assert_eq!(
+            t.children(&1).collect::<Vec<_>>(),
+            [3, 2, 5],
+            "a failed move changes nothing"
+        );
         assert!(t.move_to(&3, None, None).unwrap());
         assert_eq!(t.roots().collect::<Vec<_>>(), [1, 3]);
     }

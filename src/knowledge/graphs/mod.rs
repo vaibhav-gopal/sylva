@@ -75,7 +75,12 @@ impl Node {
     pub fn label(&self) -> String {
         ["label", "name"]
             .iter()
-            .find_map(|k| self.props.get(*k).and_then(|f| f.value.as_str()).map(str::to_string))
+            .find_map(|k| {
+                self.props
+                    .get(*k)
+                    .and_then(|f| f.value.as_str())
+                    .map(str::to_string)
+            })
             .unwrap_or_else(|| format!("{} {}", self.ty, &self.id.to_string()[..8]))
     }
 
@@ -157,7 +162,13 @@ pub struct Graph {
 
 impl Graph {
     pub fn new(id: GraphId, name: &str, scope: &str) -> Graph {
-        Graph { id, name: name.to_string(), scope: scope.to_string(), schema: None, inner: Structure::new() }
+        Graph {
+            id,
+            name: name.to_string(),
+            scope: scope.to_string(),
+            schema: None,
+            inner: Structure::new(),
+        }
     }
 
     pub fn node(&self, id: &NodeId) -> Option<&Node> {
@@ -213,7 +224,13 @@ impl Graph {
     }
 
     pub fn from_json(j: GraphJson) -> Result<Graph> {
-        let mut g = Graph { id: j.id, name: j.name, scope: j.scope, schema: j.schema, inner: Structure::new() };
+        let mut g = Graph {
+            id: j.id,
+            name: j.name,
+            scope: j.scope,
+            schema: j.schema,
+            inner: Structure::new(),
+        };
         for (id, n) in j.nodes {
             g.inner.add_node(id, n)?;
         }
@@ -257,7 +274,15 @@ impl Serialize for Graph {
             nodes: Nodes<'a>,
             edges: Edges<'a>,
         }
-        Out { id: &self.id, name: &self.name, scope: &self.scope, schema: self.schema.as_ref(), nodes: Nodes(self), edges: Edges(self) }.serialize(s)
+        Out {
+            id: &self.id,
+            name: &self.name,
+            scope: &self.scope,
+            schema: self.schema.as_ref(),
+            nodes: Nodes(self),
+            edges: Edges(self),
+        }
+        .serialize(s)
     }
 }
 
@@ -272,7 +297,11 @@ impl<'de> Deserialize<'de> for Graph {
 #[serde(tag = "type")]
 pub enum GraphOp {
     #[serde(rename = "graph.create")]
-    Create { id: GraphId, name: String, scope: String },
+    Create {
+        id: GraphId,
+        name: String,
+        scope: String,
+    },
     #[serde(rename = "graph.update")]
     Update {
         id: GraphId,
@@ -312,7 +341,11 @@ pub enum GraphOp {
     },
     /// Removes a node; its edges must be removed first.
     #[serde(rename = "graph.node.remove")]
-    NodeRemove { graph: GraphId, id: NodeId, source: Source },
+    NodeRemove {
+        graph: GraphId,
+        id: NodeId,
+        source: Source,
+    },
     #[serde(rename = "graph.edge.add")]
     EdgeAdd {
         graph: GraphId,
@@ -336,7 +369,11 @@ pub enum GraphOp {
         source: Source,
     },
     #[serde(rename = "graph.edge.remove")]
-    EdgeRemove { graph: GraphId, id: EdgeId, source: Source },
+    EdgeRemove {
+        graph: GraphId,
+        id: EdgeId,
+        source: Source,
+    },
 }
 
 impl GraphOp {
@@ -368,12 +405,17 @@ impl Graphs {
                 if self.find(&name).is_some() {
                     return invalid(format!("a graph is already named '{name}'"));
                 }
-                self.graphs.insert(*id, Graph::new(*id, &name, &scope_name(scope)?));
+                self.graphs
+                    .insert(*id, Graph::new(*id, &name, &scope_name(scope)?));
             }
             GraphOp::Update { id, name, scope } => {
                 let name = name.as_deref().map(|n| text(n, "graph name")).transpose()?;
                 if let Some(n) = &name {
-                    if self.graphs.values().any(|g| g.id != *id && g.name.eq_ignore_ascii_case(n)) {
+                    if self
+                        .graphs
+                        .values()
+                        .any(|g| g.id != *id && g.name.eq_ignore_ascii_case(n))
+                    {
                         return invalid(format!("a graph is already named '{n}'"));
                     }
                 }
@@ -398,14 +440,29 @@ impl Graphs {
                     return invalid("graph.schema does not change anything");
                 }
                 if let Some(s) = schema {
-                    for def in s.nodes.values().flat_map(|t| t.props.values()).chain(s.edges.values().flat_map(|t| t.props.values())) {
+                    for def in s
+                        .nodes
+                        .values()
+                        .flat_map(|t| t.props.values())
+                        .chain(s.edges.values().flat_map(|t| t.props.values()))
+                    {
                         validate_attr(def)?;
                     }
                     for n in g.nodes() {
-                        check_node(s, n).map_err(|e| Error::Invalid(format!("node '{}' doesn't fit the new schema: {e}", n.label())))?;
+                        check_node(s, n).map_err(|e| {
+                            Error::Invalid(format!(
+                                "node '{}' doesn't fit the new schema: {e}",
+                                n.label()
+                            ))
+                        })?;
                     }
                     for e in g.edges() {
-                        check_edge(s, g, e).map_err(|err| Error::Invalid(format!("an edge '{}' doesn't fit the new schema: {err}", e.ty)))?;
+                        check_edge(s, g, e).map_err(|err| {
+                            Error::Invalid(format!(
+                                "an edge '{}' doesn't fit the new schema: {err}",
+                                e.ty
+                            ))
+                        })?;
                     }
                 }
                 g.schema = schema.clone();
@@ -415,7 +472,14 @@ impl Graphs {
                     return Err(Error::NotFound(format!("graph {id}")));
                 }
             }
-            GraphOp::NodeAdd { graph, id, ty, props, reference, source } => {
+            GraphOp::NodeAdd {
+                graph,
+                id,
+                ty,
+                props,
+                reference,
+                source,
+            } => {
                 let g = self.graph_mut(graph)?;
                 if g.inner.contains_node(id) {
                     return invalid(format!("node {id} already exists"));
@@ -423,7 +487,18 @@ impl Graphs {
                 let node = Node {
                     id: *id,
                     ty: type_name(ty)?,
-                    props: props.iter().map(|(k, v)| (k.clone(), Fact { value: v.clone(), source: source.clone() })).collect(),
+                    props: props
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                Fact {
+                                    value: v.clone(),
+                                    source: source.clone(),
+                                },
+                            )
+                        })
+                        .collect(),
                     reference: reference.clone(),
                     source: source.clone(),
                 };
@@ -432,9 +507,18 @@ impl Graphs {
                 }
                 g.inner.add_node(*id, node)?;
             }
-            GraphOp::NodeSet { graph, id, key, value, source } => {
+            GraphOp::NodeSet {
+                graph,
+                id,
+                key,
+                value,
+                source,
+            } => {
                 let g = self.graph_mut(graph)?;
-                let mut node = g.node(id).cloned().ok_or_else(|| Error::NotFound(format!("node {id}")))?;
+                let mut node = g
+                    .node(id)
+                    .cloned()
+                    .ok_or_else(|| Error::NotFound(format!("node {id}")))?;
                 set_prop(&mut node.props, key, value, source)?;
                 if let Some(s) = &g.schema {
                     check_node(s, &node)?;
@@ -443,16 +527,32 @@ impl Graphs {
             }
             GraphOp::NodeRemove { graph, id, source } => {
                 let g = self.graph_mut(graph)?;
-                let node = g.node(id).ok_or_else(|| Error::NotFound(format!("node {id}")))?;
+                let node = g
+                    .node(id)
+                    .ok_or_else(|| Error::NotFound(format!("node {id}")))?;
                 if node.source.is_stated() && !source.is_stated() {
-                    return invalid(format!("'{}' was stated; a scanner can't remove it", node.label()));
+                    return invalid(format!(
+                        "'{}' was stated; a scanner can't remove it",
+                        node.label()
+                    ));
                 }
                 if g.inner.degree(id, Dir::Both) > 0 {
-                    return invalid(format!("'{}' still has edges; remove them first", node.label()));
+                    return invalid(format!(
+                        "'{}' still has edges; remove them first",
+                        node.label()
+                    ));
                 }
                 g.inner.remove_node(id);
             }
-            GraphOp::EdgeAdd { graph, id, from, to, ty, props, source } => {
+            GraphOp::EdgeAdd {
+                graph,
+                id,
+                from,
+                to,
+                ty,
+                props,
+                source,
+            } => {
                 let g = self.graph_mut(graph)?;
                 if g.inner.contains_edge(id) {
                     return invalid(format!("edge {id} already exists"));
@@ -471,7 +571,18 @@ impl Graphs {
                     from: *from,
                     to: *to,
                     ty,
-                    props: props.iter().map(|(k, v)| (k.clone(), Fact { value: v.clone(), source: source.clone() })).collect(),
+                    props: props
+                        .iter()
+                        .map(|(k, v)| {
+                            (
+                                k.clone(),
+                                Fact {
+                                    value: v.clone(),
+                                    source: source.clone(),
+                                },
+                            )
+                        })
+                        .collect(),
                     source: source.clone(),
                 };
                 if let Some(s) = &g.schema {
@@ -479,9 +590,18 @@ impl Graphs {
                 }
                 g.inner.add_edge(*id, *from, *to, edge)?;
             }
-            GraphOp::EdgeSet { graph, id, key, value, source } => {
+            GraphOp::EdgeSet {
+                graph,
+                id,
+                key,
+                value,
+                source,
+            } => {
                 let g = self.graph_mut(graph)?;
-                let mut edge = g.edge(id).cloned().ok_or_else(|| Error::NotFound(format!("edge {id}")))?;
+                let mut edge = g
+                    .edge(id)
+                    .cloned()
+                    .ok_or_else(|| Error::NotFound(format!("edge {id}")))?;
                 set_prop(&mut edge.props, key, value, source)?;
                 if let Some(s) = &g.schema {
                     check_edge(s, g, &edge)?;
@@ -490,7 +610,9 @@ impl Graphs {
             }
             GraphOp::EdgeRemove { graph, id, source } => {
                 let g = self.graph_mut(graph)?;
-                let edge = g.edge(id).ok_or_else(|| Error::NotFound(format!("edge {id}")))?;
+                let edge = g
+                    .edge(id)
+                    .ok_or_else(|| Error::NotFound(format!("edge {id}")))?;
                 if edge.source.is_stated() && !source.is_stated() {
                     return invalid("that edge was stated; a scanner can't remove it");
                 }
@@ -506,26 +628,42 @@ impl Graphs {
         self.graphs
             .values()
             .find(|g| g.name.eq_ignore_ascii_case(q))
-            .or_else(|| self.graphs.values().find(|g| !q.is_empty() && g.id.to_string().starts_with(&q.to_lowercase())))
+            .or_else(|| {
+                self.graphs
+                    .values()
+                    .find(|g| !q.is_empty() && g.id.to_string().starts_with(&q.to_lowercase()))
+            })
             .map(|g| g.id)
     }
 
     fn graph_mut(&mut self, id: &GraphId) -> Result<&mut Graph> {
-        self.graphs.get_mut(id).ok_or_else(|| Error::NotFound(format!("graph {id}")))
+        self.graphs
+            .get_mut(id)
+            .ok_or_else(|| Error::NotFound(format!("graph {id}")))
     }
 }
 
 /// One prop change, keeping what was stated safe from observations.
-fn set_prop(props: &mut BTreeMap<String, Fact>, key: &str, value: &Option<Value>, source: &Source) -> Result<()> {
+fn set_prop(
+    props: &mut BTreeMap<String, Fact>,
+    key: &str,
+    value: &Option<Value>,
+    source: &Source,
+) -> Result<()> {
     let key = text(key, "prop name")?;
     if let Some(old) = props.get(&key) {
         if old.source.is_stated() && !source.is_stated() {
-            return invalid(format!("'{key}' was stated; observations don't overwrite it"));
+            return invalid(format!(
+                "'{key}' was stated; observations don't overwrite it"
+            ));
         }
     }
     match value {
         Some(v) => {
-            let fact = Fact { value: v.clone(), source: source.clone() };
+            let fact = Fact {
+                value: v.clone(),
+                source: source.clone(),
+            };
             if props.get(&key) == Some(&fact) {
                 return invalid(format!("'{key}' already has that value"));
             }
@@ -540,7 +678,12 @@ fn set_prop(props: &mut BTreeMap<String, Fact>, key: &str, value: &Option<Value>
     Ok(())
 }
 
-fn check_props(s: &Schema, defs: &BTreeMap<String, AttrDef>, props: &BTreeMap<String, Fact>, what: &str) -> Result<()> {
+fn check_props(
+    s: &Schema,
+    defs: &BTreeMap<String, AttrDef>,
+    props: &BTreeMap<String, Fact>,
+    what: &str,
+) -> Result<()> {
     for (k, def) in defs {
         match props.get(k) {
             Some(f) => check_value(k, def, &f.value)?,
@@ -566,14 +709,28 @@ fn check_node(s: &Schema, n: &Node) -> Result<()> {
 
 fn check_edge(s: &Schema, g: &Graph, e: &Edge) -> Result<()> {
     let Some(t) = s.edges.get(&e.ty) else {
-        return if s.open { Ok(()) } else { invalid(format!("the schema has no edge type '{}'", e.ty)) };
+        return if s.open {
+            Ok(())
+        } else {
+            invalid(format!("the schema has no edge type '{}'", e.ty))
+        };
     };
     let ty_of = |id: &NodeId| g.node(id).map(|n| n.ty.as_str()).unwrap_or("?");
     if !t.from.is_empty() && !t.from.iter().any(|x| x == ty_of(&e.from)) {
-        return invalid(format!("'{}' edges start from {}, not {}", e.ty, t.from.join(" or "), ty_of(&e.from)));
+        return invalid(format!(
+            "'{}' edges start from {}, not {}",
+            e.ty,
+            t.from.join(" or "),
+            ty_of(&e.from)
+        ));
     }
     if !t.to.is_empty() && !t.to.iter().any(|x| x == ty_of(&e.to)) {
-        return invalid(format!("'{}' edges end at {}, not {}", e.ty, t.to.join(" or "), ty_of(&e.to)));
+        return invalid(format!(
+            "'{}' edges end at {}, not {}",
+            e.ty,
+            t.to.join(" or "),
+            ty_of(&e.to)
+        ));
     }
     check_props(s, &t.props, &e.props, &format!("a '{}' edge", e.ty))
 }
@@ -581,9 +738,14 @@ fn check_edge(s: &Schema, g: &Graph, e: &Edge) -> Result<()> {
 /// Types and scopes are short identifiers: `service`, `depends_on`, `machines`.
 fn type_name(s: &str) -> Result<String> {
     let s = s.trim();
-    let ok = !s.is_empty() && s.len() <= 48 && s.chars().all(|c| c.is_ascii_alphanumeric() || "_-.".contains(c));
+    let ok = !s.is_empty()
+        && s.len() <= 48
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "_-.".contains(c));
     if !ok {
-        return invalid(format!("'{s}' isn't a type name (letters, digits, '_', '-', '.')"));
+        return invalid(format!(
+            "'{s}' isn't a type name (letters, digits, '_', '-', '.')"
+        ));
     }
     Ok(s.to_string())
 }
@@ -608,27 +770,118 @@ mod tests {
         let mut gs = Graphs::default();
         let (g, hub) = (Uuid::now_v7(), Uuid::now_v7());
         let scan = Source::Observed("scan:machine".into());
-        gs.apply(&GraphOp::Create { id: g, name: "Machines".into(), scope: "machines".into() }).unwrap();
-        gs.apply(&GraphOp::NodeAdd { graph: g, id: hub, ty: "machine".into(), props: props(json!({ "name": "vg-pc", "os": "windows" })), reference: None, source: scan.clone() })
-            .unwrap();
-        gs.apply(&GraphOp::NodeSet { graph: g, id: hub, key: "role".into(), value: Some(json!("hub")), source: Source::Stated }).unwrap();
-        let err = gs.apply(&GraphOp::NodeSet { graph: g, id: hub, key: "role".into(), value: Some(json!("workstation")), source: scan.clone() });
+        gs.apply(&GraphOp::Create {
+            id: g,
+            name: "Machines".into(),
+            scope: "machines".into(),
+        })
+        .unwrap();
+        gs.apply(&GraphOp::NodeAdd {
+            graph: g,
+            id: hub,
+            ty: "machine".into(),
+            props: props(json!({ "name": "vg-pc", "os": "windows" })),
+            reference: None,
+            source: scan.clone(),
+        })
+        .unwrap();
+        gs.apply(&GraphOp::NodeSet {
+            graph: g,
+            id: hub,
+            key: "role".into(),
+            value: Some(json!("hub")),
+            source: Source::Stated,
+        })
+        .unwrap();
+        let err = gs.apply(&GraphOp::NodeSet {
+            graph: g,
+            id: hub,
+            key: "role".into(),
+            value: Some(json!("workstation")),
+            source: scan.clone(),
+        });
         assert!(err.unwrap_err().to_string().contains("stated"));
-        gs.apply(&GraphOp::NodeSet { graph: g, id: hub, key: "os".into(), value: Some(json!("windows 11")), source: scan.clone() }).unwrap();
-        assert!(gs.apply(&GraphOp::NodeSet { graph: g, id: hub, key: "os".into(), value: Some(json!("windows 11")), source: scan.clone() }).is_err(), "no-op");
+        gs.apply(&GraphOp::NodeSet {
+            graph: g,
+            id: hub,
+            key: "os".into(),
+            value: Some(json!("windows 11")),
+            source: scan.clone(),
+        })
+        .unwrap();
+        assert!(
+            gs.apply(&GraphOp::NodeSet {
+                graph: g,
+                id: hub,
+                key: "os".into(),
+                value: Some(json!("windows 11")),
+                source: scan.clone()
+            })
+            .is_err(),
+            "no-op"
+        );
         let laptop = Uuid::now_v7();
-        gs.apply(&GraphOp::NodeAdd { graph: g, id: laptop, ty: "machine".into(), props: props(json!({ "name": "mac" })), reference: None, source: Source::Stated }).unwrap();
-        assert!(gs.apply(&GraphOp::NodeRemove { graph: g, id: laptop, source: scan.clone() }).is_err());
-        let e = Uuid::now_v7();
-        gs.apply(&GraphOp::EdgeAdd { graph: g, id: e, from: laptop, to: hub, ty: "syncs_with".into(), props: BTreeMap::new(), source: Source::Stated }).unwrap();
+        gs.apply(&GraphOp::NodeAdd {
+            graph: g,
+            id: laptop,
+            ty: "machine".into(),
+            props: props(json!({ "name": "mac" })),
+            reference: None,
+            source: Source::Stated,
+        })
+        .unwrap();
         assert!(gs
-            .apply(&GraphOp::EdgeAdd { graph: g, id: Uuid::now_v7(), from: laptop, to: hub, ty: "syncs_with".into(), props: BTreeMap::new(), source: Source::Stated })
+            .apply(&GraphOp::NodeRemove {
+                graph: g,
+                id: laptop,
+                source: scan.clone()
+            })
+            .is_err());
+        let e = Uuid::now_v7();
+        gs.apply(&GraphOp::EdgeAdd {
+            graph: g,
+            id: e,
+            from: laptop,
+            to: hub,
+            ty: "syncs_with".into(),
+            props: BTreeMap::new(),
+            source: Source::Stated,
+        })
+        .unwrap();
+        assert!(gs
+            .apply(&GraphOp::EdgeAdd {
+                graph: g,
+                id: Uuid::now_v7(),
+                from: laptop,
+                to: hub,
+                ty: "syncs_with".into(),
+                props: BTreeMap::new(),
+                source: Source::Stated
+            })
             .unwrap_err()
             .to_string()
             .contains("already exists"));
-        assert!(gs.apply(&GraphOp::NodeRemove { graph: g, id: hub, source: Source::Stated }).unwrap_err().to_string().contains("edges"));
-        gs.apply(&GraphOp::EdgeRemove { graph: g, id: e, source: Source::Stated }).unwrap();
-        gs.apply(&GraphOp::NodeRemove { graph: g, id: hub, source: scan }).unwrap();
+        assert!(gs
+            .apply(&GraphOp::NodeRemove {
+                graph: g,
+                id: hub,
+                source: Source::Stated
+            })
+            .unwrap_err()
+            .to_string()
+            .contains("edges"));
+        gs.apply(&GraphOp::EdgeRemove {
+            graph: g,
+            id: e,
+            source: Source::Stated,
+        })
+        .unwrap();
+        gs.apply(&GraphOp::NodeRemove {
+            graph: g,
+            id: hub,
+            source: scan,
+        })
+        .unwrap();
         assert_eq!(gs.graphs[&g].node_count(), 1);
         assert_eq!(gs.find("machines"), Some(g));
     }
@@ -637,29 +890,111 @@ mod tests {
     fn schemas_constrain_types_props_and_edge_ends() {
         let mut gs = Graphs::default();
         let g = Uuid::now_v7();
-        gs.apply(&GraphOp::Create { id: g, name: "Stack".into(), scope: "stacks".into() }).unwrap();
-        let text_req = AttrDef { ty: AttrType::Text, options: vec![], unit: None, min: None, max: None, required: true };
-        let port = AttrDef { ty: AttrType::Number, options: vec![], unit: None, min: None, max: None, required: false };
+        gs.apply(&GraphOp::Create {
+            id: g,
+            name: "Stack".into(),
+            scope: "stacks".into(),
+        })
+        .unwrap();
+        let text_req = AttrDef {
+            ty: AttrType::Text,
+            options: vec![],
+            unit: None,
+            min: None,
+            max: None,
+            required: true,
+        };
+        let port = AttrDef {
+            ty: AttrType::Number,
+            options: vec![],
+            unit: None,
+            min: None,
+            max: None,
+            required: false,
+        };
         let schema = Schema {
-            nodes: [("service".into(), NodeType { props: [("name".into(), text_req), ("port".into(), port)].into() }), ("db".into(), NodeType::default())].into(),
-            edges: [("calls".into(), EdgeType { from: vec!["service".into()], to: vec!["service".into(), "db".into()], props: BTreeMap::new() })].into(),
+            nodes: [
+                (
+                    "service".into(),
+                    NodeType {
+                        props: [("name".into(), text_req), ("port".into(), port)].into(),
+                    },
+                ),
+                ("db".into(), NodeType::default()),
+            ]
+            .into(),
+            edges: [(
+                "calls".into(),
+                EdgeType {
+                    from: vec!["service".into()],
+                    to: vec!["service".into(), "db".into()],
+                    props: BTreeMap::new(),
+                },
+            )]
+            .into(),
             open: false,
         };
-        gs.apply(&GraphOp::SetSchema { id: g, schema: Some(schema) }).unwrap();
+        gs.apply(&GraphOp::SetSchema {
+            id: g,
+            schema: Some(schema),
+        })
+        .unwrap();
         let add = |gs: &mut Graphs, ty: &str, p: Value| {
             let id = Uuid::now_v7();
-            gs.apply(&GraphOp::NodeAdd { graph: g, id, ty: ty.into(), props: props(p), reference: None, source: Source::Stated }).map(|_| id)
+            gs.apply(&GraphOp::NodeAdd {
+                graph: g,
+                id,
+                ty: ty.into(),
+                props: props(p),
+                reference: None,
+                source: Source::Stated,
+            })
+            .map(|_| id)
         };
         let api = add(&mut gs, "service", json!({ "name": "api", "port": 7878 })).unwrap();
         let db = add(&mut gs, "db", json!({})).unwrap();
-        assert!(add(&mut gs, "service", json!({ "port": 1 })).unwrap_err().to_string().contains("needs 'name'"));
-        assert!(add(&mut gs, "service", json!({ "name": "x", "port": "high" })).unwrap_err().to_string().contains("a number"));
-        assert!(add(&mut gs, "service", json!({ "name": "x", "colour": "red" })).unwrap_err().to_string().contains("no prop"));
-        assert!(add(&mut gs, "queue", json!({})).unwrap_err().to_string().contains("no node type"));
-        let edge = |gs: &mut Graphs, from, to| gs.apply(&GraphOp::EdgeAdd { graph: g, id: Uuid::now_v7(), from, to, ty: "calls".into(), props: BTreeMap::new(), source: Source::Stated });
+        assert!(add(&mut gs, "service", json!({ "port": 1 }))
+            .unwrap_err()
+            .to_string()
+            .contains("needs 'name'"));
+        assert!(
+            add(&mut gs, "service", json!({ "name": "x", "port": "high" }))
+                .unwrap_err()
+                .to_string()
+                .contains("a number")
+        );
+        assert!(
+            add(&mut gs, "service", json!({ "name": "x", "colour": "red" }))
+                .unwrap_err()
+                .to_string()
+                .contains("no prop")
+        );
+        assert!(add(&mut gs, "queue", json!({}))
+            .unwrap_err()
+            .to_string()
+            .contains("no node type"));
+        let edge = |gs: &mut Graphs, from, to| {
+            gs.apply(&GraphOp::EdgeAdd {
+                graph: g,
+                id: Uuid::now_v7(),
+                from,
+                to,
+                ty: "calls".into(),
+                props: BTreeMap::new(),
+                source: Source::Stated,
+            })
+        };
         edge(&mut gs, api, db).unwrap();
-        assert!(edge(&mut gs, db, api).unwrap_err().to_string().contains("start from service"));
-        assert!(gs.apply(&GraphOp::SetSchema { id: g, schema: Some(Schema::default()) }).is_err());
+        assert!(edge(&mut gs, db, api)
+            .unwrap_err()
+            .to_string()
+            .contains("start from service"));
+        assert!(gs
+            .apply(&GraphOp::SetSchema {
+                id: g,
+                schema: Some(Schema::default())
+            })
+            .is_err());
     }
 
     #[test]

@@ -13,7 +13,11 @@ use crate::{Error, Key, Result};
 
 /// Which way to follow edges.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(rename_all = "snake_case"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "snake_case")
+)]
 pub enum Dir {
     /// Along edges (from → to).
     #[default]
@@ -82,7 +86,14 @@ pub struct Graph<N, E, K: Key = uuid::Uuid> {
 
 impl<N, E, K: Key> Default for Graph<N, E, K> {
     fn default() -> Self {
-        Graph { nodes: Vec::new(), free_nodes: Vec::new(), node_index: BTreeMap::new(), edges: Vec::new(), free_edges: Vec::new(), edge_index: BTreeMap::new() }
+        Graph {
+            nodes: Vec::new(),
+            free_nodes: Vec::new(),
+            node_index: BTreeMap::new(),
+            edges: Vec::new(),
+            free_edges: Vec::new(),
+            edge_index: BTreeMap::new(),
+        }
     }
 }
 
@@ -157,20 +168,31 @@ impl<N, E, K: Key> Graph<N, E, K> {
     }
 
     fn ns(&self, i: u32) -> &NodeSlot<N, K> {
-        self.nodes[i as usize].as_ref().expect("indexed node slots are live")
+        self.nodes[i as usize]
+            .as_ref()
+            .expect("indexed node slots are live")
     }
 
     fn ns_mut(&mut self, i: u32) -> &mut NodeSlot<N, K> {
-        self.nodes[i as usize].as_mut().expect("indexed node slots are live")
+        self.nodes[i as usize]
+            .as_mut()
+            .expect("indexed node slots are live")
     }
 
     fn es(&self, i: u32) -> &EdgeSlot<E, K> {
-        self.edges[i as usize].as_ref().expect("indexed edge slots are live")
+        self.edges[i as usize]
+            .as_ref()
+            .expect("indexed edge slots are live")
     }
 
     fn edge_ref(&self, i: u32) -> EdgeRef<'_, E, K> {
         let e = self.es(i);
-        EdgeRef { key: e.key, from: self.ns(e.from).key, to: self.ns(e.to).key, data: &e.data }
+        EdgeRef {
+            key: e.key,
+            from: self.ns(e.from).key,
+            to: self.ns(e.to).key,
+            data: &e.data,
+        }
     }
 
     pub fn node(&self, key: &K) -> Option<&N> {
@@ -195,7 +217,12 @@ impl<N, E, K: Key> Graph<N, E, K> {
         if self.node_index.contains_key(&key) {
             return invalid(format!("node {key} already exists"));
         }
-        let slot = NodeSlot { key, data, out: Vec::new(), inc: Vec::new() };
+        let slot = NodeSlot {
+            key,
+            data,
+            out: Vec::new(),
+            inc: Vec::new(),
+        };
         let i = match self.free_nodes.pop() {
             Some(i) => {
                 self.nodes[i as usize] = Some(slot);
@@ -213,9 +240,13 @@ impl<N, E, K: Key> Graph<N, E, K> {
     /// Removes a node and every edge touching it; returns the node's data.
     pub fn remove_node(&mut self, key: &K) -> Option<N> {
         let i = self.node_index.remove(key)?;
-        let slot = self.nodes[i as usize].take().expect("indexed node slots are live");
+        let slot = self.nodes[i as usize]
+            .take()
+            .expect("indexed node slots are live");
         for (ek, ei) in slot.out.iter().chain(slot.inc.iter()) {
-            let Some(e) = self.edges[*ei as usize].take() else { continue }; // a self-loop, already removed
+            let Some(e) = self.edges[*ei as usize].take() else {
+                continue;
+            }; // a self-loop, already removed
             self.edge_index.remove(ek);
             self.free_edges.push(*ei);
             if e.from != i {
@@ -233,9 +264,20 @@ impl<N, E, K: Key> Graph<N, E, K> {
         if self.edge_index.contains_key(&key) {
             return invalid(format!("edge {key} already exists"));
         }
-        let f = *self.node_index.get(&from).ok_or_else(|| Error::NotFound(format!("node {from}")))?;
-        let t = *self.node_index.get(&to).ok_or_else(|| Error::NotFound(format!("node {to}")))?;
-        let slot = EdgeSlot { key, from: f, to: t, data };
+        let f = *self
+            .node_index
+            .get(&from)
+            .ok_or_else(|| Error::NotFound(format!("node {from}")))?;
+        let t = *self
+            .node_index
+            .get(&to)
+            .ok_or_else(|| Error::NotFound(format!("node {to}")))?;
+        let slot = EdgeSlot {
+            key,
+            from: f,
+            to: t,
+            data,
+        };
         let ei = match self.free_edges.pop() {
             Some(i) => {
                 self.edges[i as usize] = Some(slot);
@@ -254,7 +296,9 @@ impl<N, E, K: Key> Graph<N, E, K> {
 
     pub fn remove_edge(&mut self, key: &K) -> Option<E> {
         let ei = self.edge_index.remove(key)?;
-        let e = self.edges[ei as usize].take().expect("indexed edge slots are live");
+        let e = self.edges[ei as usize]
+            .take()
+            .expect("indexed edge slots are live");
         remove_sorted(&mut self.ns_mut(e.from).out, key);
         remove_sorted(&mut self.ns_mut(e.to).inc, key);
         self.free_edges.push(ei);
@@ -271,7 +315,9 @@ impl<N, E, K: Key> Graph<N, E, K> {
     }
 
     /// Every edge, in key order.
-    pub fn edges(&self) -> impl DoubleEndedIterator<Item = EdgeRef<'_, E, K>> + ExactSizeIterator + '_ {
+    pub fn edges(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = EdgeRef<'_, E, K>> + ExactSizeIterator + '_ {
         self.edge_index.values().map(|&i| self.edge_ref(i))
     }
 
@@ -283,12 +329,18 @@ impl<N, E, K: Key> Graph<N, E, K> {
     }
 
     /// Edges leaving `key`, in edge key order.
-    pub fn out_edges(&self, key: &K) -> impl DoubleEndedIterator<Item = EdgeRef<'_, E, K>> + ExactSizeIterator + '_ {
+    pub fn out_edges(
+        &self,
+        key: &K,
+    ) -> impl DoubleEndedIterator<Item = EdgeRef<'_, E, K>> + ExactSizeIterator + '_ {
         self.lists(key).0.iter().map(|(_, i)| self.edge_ref(*i))
     }
 
     /// Edges arriving at `key`, in edge key order.
-    pub fn in_edges(&self, key: &K) -> impl DoubleEndedIterator<Item = EdgeRef<'_, E, K>> + ExactSizeIterator + '_ {
+    pub fn in_edges(
+        &self,
+        key: &K,
+    ) -> impl DoubleEndedIterator<Item = EdgeRef<'_, E, K>> + ExactSizeIterator + '_ {
         self.lists(key).1.iter().map(|(_, i)| self.edge_ref(*i))
     }
 
@@ -321,14 +373,25 @@ impl<N, E, K: Key> Graph<N, E, K> {
         match dir {
             Dir::Out => Merge { a: &s.out, b: &[] },
             Dir::In => Merge { a: &[], b: &s.inc },
-            Dir::Both => Merge { a: &s.out, b: &s.inc },
+            Dir::Both => Merge {
+                a: &s.out,
+                b: &s.inc,
+            },
         }
     }
 
     /// Nodes within `depth` steps of `start`, breadth first, each once,
     /// nearest first; `follow` decides which edges count.
-    pub fn walk(&self, start: &K, dir: Dir, depth: usize, mut follow: impl FnMut(&E) -> bool) -> Vec<Reached<K>> {
-        let Some(&s) = self.node_index.get(start) else { return Vec::new() };
+    pub fn walk(
+        &self,
+        start: &K,
+        dir: Dir,
+        depth: usize,
+        mut follow: impl FnMut(&E) -> bool,
+    ) -> Vec<Reached<K>> {
+        let Some(&s) = self.node_index.get(start) else {
+            return Vec::new();
+        };
         let mut seen = vec![false; self.nodes.len()];
         seen[s as usize] = true;
         let mut queue = VecDeque::from([(s, 0usize)]);
@@ -345,7 +408,11 @@ impl<N, E, K: Key> Graph<N, E, K> {
                 let next = if forward { e.to } else { e.from };
                 if !seen[next as usize] {
                     seen[next as usize] = true;
-                    out.push(Reached { node: self.ns(next).key, depth: d + 1, via: e.key });
+                    out.push(Reached {
+                        node: self.ns(next).key,
+                        depth: d + 1,
+                        via: e.key,
+                    });
                     queue.push_back((next, d + 1));
                 }
             }
@@ -354,7 +421,14 @@ impl<N, E, K: Key> Graph<N, E, K> {
     }
 
     /// The shortest path from `from` to `to` (as the edges taken), breadth first.
-    pub fn shortest_path(&self, from: &K, to: &K, dir: Dir, max_depth: usize, mut follow: impl FnMut(&E) -> bool) -> Option<Vec<K>> {
+    pub fn shortest_path(
+        &self,
+        from: &K,
+        to: &K,
+        dir: Dir,
+        max_depth: usize,
+        mut follow: impl FnMut(&E) -> bool,
+    ) -> Option<Vec<K>> {
         let (&f, &t) = (self.node_index.get(from)?, self.node_index.get(to)?);
         if f == t {
             return Some(Vec::new());
@@ -398,9 +472,17 @@ impl<N, E, K: Key> Graph<N, E, K> {
     /// The nodes in an order where every edge points forward (ties broken by
     /// key), or the nodes that are on or behind a cycle.
     pub fn topological_order(&self) -> std::result::Result<Vec<K>, Vec<K>> {
-        let mut indegree: Vec<usize> = self.nodes.iter().map(|n| n.as_ref().map_or(0, |n| n.inc.len())).collect();
-        let mut ready: std::collections::BTreeSet<(K, u32)> =
-            self.node_index.iter().filter(|(_, &i)| indegree[i as usize] == 0).map(|(k, &i)| (*k, i)).collect();
+        let mut indegree: Vec<usize> = self
+            .nodes
+            .iter()
+            .map(|n| n.as_ref().map_or(0, |n| n.inc.len()))
+            .collect();
+        let mut ready: std::collections::BTreeSet<(K, u32)> = self
+            .node_index
+            .iter()
+            .filter(|(_, &i)| indegree[i as usize] == 0)
+            .map(|(k, &i)| (*k, i))
+            .collect();
         let mut out = Vec::with_capacity(self.node_count());
         while let Some((k, i)) = ready.pop_first() {
             out.push(k);
@@ -426,7 +508,9 @@ impl<N: PartialEq, E: PartialEq, K: Key> PartialEq for Graph<N, E, K> {
         self.node_count() == other.node_count()
             && self.edge_count() == other.edge_count()
             && self.nodes().zip(other.nodes()).all(|(a, b)| a == b)
-            && self.edges().zip(other.edges()).all(|(a, b)| a.key == b.key && a.from == b.from && a.to == b.to && a.data == b.data)
+            && self.edges().zip(other.edges()).all(|(a, b)| {
+                a.key == b.key && a.from == b.from && a.to == b.to && a.data == b.data
+            })
     }
 }
 
@@ -440,7 +524,12 @@ mod tests {
         for (k, n) in [(1, "web"), (2, "api"), (3, "worker"), (4, "db"), (5, "hub")] {
             g.add_node(k, n).unwrap();
         }
-        for (k, a, b, t) in [(10, 1, 2, "calls"), (11, 2, 4, "calls"), (12, 3, 4, "calls"), (13, 2, 5, "runs_on")] {
+        for (k, a, b, t) in [
+            (10, 1, 2, "calls"),
+            (11, 2, 4, "calls"),
+            (12, 3, 4, "calls"),
+            (13, 2, 5, "runs_on"),
+        ] {
             g.add_edge(k, a, b, t).unwrap();
         }
         g
@@ -452,17 +541,37 @@ mod tests {
         assert_eq!((g.node_count(), g.edge_count()), (5, 4));
         let mut h = g.clone();
         assert!(h.add_node(1, "dup").is_err());
-        assert!(matches!(h.add_edge(99, 1, 42, "x"), Err(Error::NotFound(_))));
+        assert!(matches!(
+            h.add_edge(99, 1, 42, "x"),
+            Err(Error::NotFound(_))
+        ));
         assert_eq!(g.out_edges(&2).map(|e| e.to).collect::<Vec<_>>(), [4, 5]);
         assert_eq!(g.in_edges(&4).map(|e| e.from).collect::<Vec<_>>(), [2, 3]);
-        assert_eq!(g.walk(&1, Dir::Out, 1, |_| true).iter().map(|r| r.node).collect::<Vec<_>>(), [2]);
+        assert_eq!(
+            g.walk(&1, Dir::Out, 1, |_| true)
+                .iter()
+                .map(|r| r.node)
+                .collect::<Vec<_>>(),
+            [2]
+        );
         assert_eq!(g.walk(&1, Dir::Out, 9, |_| true).len(), 3);
         assert_eq!(g.walk(&1, Dir::Out, 9, |t| *t == "calls").len(), 2);
-        let hit: Vec<u32> = g.walk(&4, Dir::In, usize::MAX, |_| true).iter().map(|r| r.node).collect();
+        let hit: Vec<u32> = g
+            .walk(&4, Dir::In, usize::MAX, |_| true)
+            .iter()
+            .map(|r| r.node)
+            .collect();
         assert_eq!(hit, [2, 3, 1]);
-        assert_eq!(g.shortest_path(&1, &4, Dir::Out, 10, |_| true), Some(vec![10, 11]));
+        assert_eq!(
+            g.shortest_path(&1, &4, Dir::Out, 10, |_| true),
+            Some(vec![10, 11])
+        );
         assert_eq!(g.shortest_path(&4, &1, Dir::Out, 10, |_| true), None);
-        assert_eq!(g.shortest_path(&4, &1, Dir::Both, 10, |_| true).map(|p| p.len()), Some(2));
+        assert_eq!(
+            g.shortest_path(&4, &1, Dir::Both, 10, |_| true)
+                .map(|p| p.len()),
+            Some(2)
+        );
         assert_eq!(g.degree(&2, Dir::Both), 3);
         assert_eq!(g.topological_order().unwrap()[..2], [1, 2]);
     }
@@ -478,7 +587,10 @@ mod tests {
         // Freed slots are reused without disturbing key order.
         g.add_node(0, "first").unwrap();
         g.add_edge(20, 0, 4, "calls").unwrap();
-        assert_eq!(g.nodes().map(|(k, _)| k).collect::<Vec<_>>(), [0, 1, 3, 4, 5]);
+        assert_eq!(
+            g.nodes().map(|(k, _)| k).collect::<Vec<_>>(),
+            [0, 1, 3, 4, 5]
+        );
         assert_eq!(g.in_edges(&4).map(|e| e.key).collect::<Vec<_>>(), [12, 20]);
         // A self-loop is one edge, in both lists, removed once.
         g.add_edge(30, 5, 5, "self").unwrap();

@@ -12,8 +12,14 @@ use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EntityRef {
-    Entity { domain: String, kind: String, id: Uuid },
-    File { path: String },
+    Entity {
+        domain: String,
+        kind: String,
+        id: Uuid,
+    },
+    File {
+        path: String,
+    },
 }
 
 impl fmt::Display for EntityRef {
@@ -31,17 +37,27 @@ impl FromStr for EntityRef {
     fn from_str(s: &str) -> Result<Self> {
         if let Some(path) = s.strip_prefix("files:") {
             validate_path(path)?;
-            return Ok(EntityRef::File { path: path.to_string() });
+            return Ok(EntityRef::File {
+                path: path.to_string(),
+            });
         }
         let parts: Vec<&str> = s.split('/').collect();
-        let ident = |p: &str| !p.is_empty() && p.bytes().all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit());
+        let ident = |p: &str| {
+            !p.is_empty()
+                && p.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit())
+        };
         match parts.as_slice() {
             [domain, kind, id] if ident(domain) && ident(kind) => Ok(EntityRef::Entity {
                 domain: domain.to_string(),
                 kind: kind.to_string(),
-                id: id.parse().map_err(|_| Error::Invalid(format!("bad id in reference {s}")))?,
+                id: id
+                    .parse()
+                    .map_err(|_| Error::Invalid(format!("bad id in reference {s}")))?,
             }),
-            _ => invalid(format!("not an entity reference (domain/kind/id or files:path): {s}")),
+            _ => invalid(format!(
+                "not an entity reference (domain/kind/id or files:path): {s}"
+            )),
         }
     }
 }
@@ -54,7 +70,9 @@ impl Serialize for EntityRef {
 
 impl<'de> Deserialize<'de> for EntityRef {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
-        String::deserialize(d)?.parse().map_err(serde::de::Error::custom)
+        String::deserialize(d)?
+            .parse()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -77,7 +95,10 @@ pub fn validate_path(path: &str) -> Result<()> {
         if part.ends_with(' ') || part.ends_with('.') {
             return invalid(format!("segment '{part}' may not end with a space or dot"));
         }
-        if part.chars().any(|c| c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')) {
+        if part
+            .chars()
+            .any(|c| c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+        {
             return invalid(format!("illegal character in {path}"));
         }
     }
@@ -94,16 +115,38 @@ mod tests {
         let r: EntityRef = format!("recount/entry/{id}").parse().unwrap();
         assert_eq!(r.to_string(), format!("recount/entry/{id}"));
         let f: EntityRef = "files:finance/Receipts/2026/a.pdf".parse().unwrap();
-        assert_eq!(f, EntityRef::File { path: "finance/Receipts/2026/a.pdf".into() });
-        for bad in ["recount/entry", "Recount/entry/x", "files:../x", "a/b/not-a-uuid"] {
+        assert_eq!(
+            f,
+            EntityRef::File {
+                path: "finance/Receipts/2026/a.pdf".into()
+            }
+        );
+        for bad in [
+            "recount/entry",
+            "Recount/entry/x",
+            "files:../x",
+            "a/b/not-a-uuid",
+        ] {
             assert!(bad.parse::<EntityRef>().is_err(), "{bad}");
         }
-        assert_eq!(serde_json::to_string(&f).unwrap(), r#""files:finance/Receipts/2026/a.pdf""#);
+        assert_eq!(
+            serde_json::to_string(&f).unwrap(),
+            r#""files:finance/Receipts/2026/a.pdf""#
+        );
     }
 
     #[test]
     fn rejects_unsafe_paths() {
-        for bad in ["", "../x.md", "a//b.md", "/abs.md", ".obsidian/app.json", "a\\b.md", "C:/x.md", "a/./b.md"] {
+        for bad in [
+            "",
+            "../x.md",
+            "a//b.md",
+            "/abs.md",
+            ".obsidian/app.json",
+            "a\\b.md",
+            "C:/x.md",
+            "a/./b.md",
+        ] {
             assert!(validate_path(bad).is_err(), "{bad:?} should be rejected");
         }
         assert!(validate_path("keep/Notes/a b.md").is_ok());

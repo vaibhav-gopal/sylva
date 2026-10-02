@@ -32,7 +32,14 @@ where
 {
     /// An empty history taking a snapshot every `every` batches (at least 1).
     pub fn new(every: usize) -> Self {
-        History { batches: Vec::new(), ids: BTreeSet::new(), state: P::default(), conflicts: Vec::new(), snapshots: vec![(0, P::default(), 0)], every: every.max(1) }
+        History {
+            batches: Vec::new(),
+            ids: BTreeSet::new(),
+            state: P::default(),
+            conflicts: Vec::new(),
+            snapshots: vec![(0, P::default(), 0)],
+            every: every.max(1),
+        }
     }
 
     pub fn from_batches(batches: Vec<Batch<P::Op>>, every: usize) -> Self {
@@ -59,7 +66,8 @@ where
             apply_batch(&mut self.state, &batch, &mut self.conflicts);
             self.batches.push(batch);
             if self.batches.len().is_multiple_of(self.every) {
-                self.snapshots.push((self.batches.len(), self.state.clone(), self.conflicts.len()));
+                self.snapshots
+                    .push((self.batches.len(), self.state.clone(), self.conflicts.len()));
             }
             return Ok(());
         }
@@ -67,7 +75,11 @@ where
         let mut all = std::mem::take(&mut self.batches);
         all.push(batch);
         let ordered: Vec<Batch<P::Op>> = order(&all).into_iter().cloned().collect();
-        let first_change = all.iter().zip(&ordered).position(|(a, b)| a.header.batch != b.header.batch).unwrap_or(all.len() - 1);
+        let first_change = all
+            .iter()
+            .zip(&ordered)
+            .position(|(a, b)| a.header.batch != b.header.batch)
+            .unwrap_or(all.len() - 1);
         self.batches = ordered;
         self.rebuild_from(first_change);
         Ok(())
@@ -76,14 +88,19 @@ where
     /// Recomputes state from the last snapshot at or before `step`.
     fn rebuild_from(&mut self, step: usize) {
         self.snapshots.retain(|(n, _, _)| *n <= step);
-        let (n, state, c) = self.snapshots.last().cloned().expect("the empty snapshot is never dropped");
+        let (n, state, c) = self
+            .snapshots
+            .last()
+            .cloned()
+            .expect("the empty snapshot is never dropped");
         self.state = state;
         self.conflicts.truncate(c);
         for (i, b) in self.batches.iter().enumerate().skip(n) {
             apply_batch(&mut self.state, b, &mut self.conflicts);
             let done = i + 1;
             if done.is_multiple_of(self.every) {
-                self.snapshots.push((done, self.state.clone(), self.conflicts.len()));
+                self.snapshots
+                    .push((done, self.state.clone(), self.conflicts.len()));
             }
         }
     }
@@ -125,7 +142,13 @@ where
         if step == self.batches.len() {
             return (self.state.clone(), self.conflicts.clone());
         }
-        let (n, state, c) = self.snapshots.iter().rev().find(|(n, _, _)| *n <= step).cloned().expect("the empty snapshot is first");
+        let (n, state, c) = self
+            .snapshots
+            .iter()
+            .rev()
+            .find(|(n, _, _)| *n <= step)
+            .cloned()
+            .expect("the empty snapshot is first");
         let mut state = state;
         let mut conflicts = self.conflicts[..c].to_vec();
         for b in &self.batches[n..step] {
@@ -137,8 +160,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::tests::{batch, Counter};
     use super::super::replay;
+    use super::super::tests::{batch, Counter};
     use super::*;
 
     #[test]
@@ -157,12 +180,20 @@ mod tests {
     #[test]
     fn a_merged_branch_lands_in_causal_order() {
         let mut h: History<Counter> = History::new(1);
-        for b in [batch(1, None, vec![5]), batch(2, Some(1), vec![-1]), batch(4, Some(2), vec![1])] {
+        for b in [
+            batch(1, None, vec![5]),
+            batch(2, Some(1), vec![-1]),
+            batch(4, Some(2), vec![1]),
+        ] {
             h.push(b).unwrap();
         }
         // 3 was written after 1 on another branch; it sorts before 4.
         h.push(batch(3, Some(1), vec![-5])).unwrap();
-        let ids: Vec<u128> = h.batches().iter().map(|b| b.header.batch.as_u128()).collect();
+        let ids: Vec<u128> = h
+            .batches()
+            .iter()
+            .map(|b| b.header.batch.as_u128())
+            .collect();
         assert_eq!(ids, [1, 2, 3, 4]);
         let all: Vec<_> = h.batches().to_vec();
         let (replayed, conflicts): (Counter, _) = replay(&all);

@@ -69,8 +69,14 @@ impl<O: Serialize + DeserializeOwned> Batch<O> {
 
     pub fn from_jsonl(text: &str) -> Result<Self> {
         let mut lines = text.lines().filter(|l| !l.trim().is_empty());
-        let header: Header = serde_json::from_str(lines.next().ok_or_else(|| Error::Invalid("empty batch file".into()))?)?;
-        let ops = lines.map(serde_json::from_str).collect::<std::result::Result<Vec<O>, _>>()?;
+        let header: Header = serde_json::from_str(
+            lines
+                .next()
+                .ok_or_else(|| Error::Invalid("empty batch file".into()))?,
+        )?;
+        let ops = lines
+            .map(serde_json::from_str)
+            .collect::<std::result::Result<Vec<O>, _>>()?;
         Ok(Batch { header, ops })
     }
 }
@@ -84,7 +90,11 @@ pub fn order<O>(batches: &[Batch<O>]) -> Vec<&Batch<O>> {
     let mut children: BTreeMap<Uuid, Vec<&Batch<O>>> = BTreeMap::new();
     let mut ready: BTreeMap<Uuid, &Batch<O>> = BTreeMap::new();
     for b in batches {
-        match b.header.after.filter(|a| ids.contains(a) && *a != b.header.batch) {
+        match b
+            .header
+            .after
+            .filter(|a| ids.contains(a) && *a != b.header.batch)
+        {
             Some(parent) => children.entry(parent).or_default().push(b),
             None => {
                 ready.insert(b.header.batch, b);
@@ -136,14 +146,26 @@ pub struct Conflict<O> {
 }
 
 /// Applies one batch, collecting the ops that don't apply.
-pub fn apply_batch<P: Projection>(state: &mut P, batch: &Batch<P::Op>, conflicts: &mut Vec<Conflict<P::Op>>)
-where
+pub fn apply_batch<P: Projection>(
+    state: &mut P,
+    batch: &Batch<P::Op>,
+    conflicts: &mut Vec<Conflict<P::Op>>,
+) where
     P::Op: Clone,
 {
-    let meta = Meta { batch: batch.header.batch, author: &batch.header.author, at: batch.header.at };
+    let meta = Meta {
+        batch: batch.header.batch,
+        author: &batch.header.author,
+        at: batch.header.at,
+    };
     for (index, op) in batch.ops.iter().enumerate() {
         if let Err(e) = state.apply(op, &meta) {
-            conflicts.push(Conflict { batch: batch.header.batch, index, op: op.clone(), reason: e.to_string() });
+            conflicts.push(Conflict {
+                batch: batch.header.batch,
+                index,
+                op: op.clone(),
+                reason: e.to_string(),
+            });
         }
     }
 }
@@ -157,7 +179,9 @@ where
 }
 
 /// Replays batches already in causal order.
-pub fn replay_ordered<'a, P: Projection>(batches: impl IntoIterator<Item = &'a Batch<P::Op>>) -> (P, Vec<Conflict<P::Op>>)
+pub fn replay_ordered<'a, P: Projection>(
+    batches: impl IntoIterator<Item = &'a Batch<P::Op>>,
+) -> (P, Vec<Conflict<P::Op>>)
 where
     P::Op: Clone + 'a,
 {
@@ -192,7 +216,13 @@ pub(crate) mod tests {
 
     pub fn batch(n: u128, after: Option<u128>, ops: Vec<i64>) -> Batch<i64> {
         Batch {
-            header: Header { batch: Uuid::from_u128(n), after: after.map(Uuid::from_u128), author: "user".into(), at: n as i64, message: None },
+            header: Header {
+                batch: Uuid::from_u128(n),
+                after: after.map(Uuid::from_u128),
+                author: "user".into(),
+                at: n as i64,
+                message: None,
+            },
             ops,
         }
     }
@@ -200,15 +230,26 @@ pub(crate) mod tests {
     #[test]
     fn orders_causally_and_merges_branches() {
         // 1 → 2 → 4 on one branch, 1 → 3 on another; 3 sorts before 4 once both are ready.
-        let bs = vec![batch(4, Some(2), vec![1]), batch(3, Some(1), vec![-5]), batch(1, None, vec![5]), batch(2, Some(1), vec![-1])];
-        let ids: Vec<u128> = order(&bs).iter().map(|b| b.header.batch.as_u128()).collect();
+        let bs = vec![
+            batch(4, Some(2), vec![1]),
+            batch(3, Some(1), vec![-5]),
+            batch(1, None, vec![5]),
+            batch(2, Some(1), vec![-1]),
+        ];
+        let ids: Vec<u128> = order(&bs)
+            .iter()
+            .map(|b| b.header.batch.as_u128())
+            .collect();
         assert_eq!(ids, [1, 2, 3, 4]);
         assert_eq!(head(&bs), Some(Uuid::from_u128(4)));
         // 5 - 1 = 4, then -5 doesn't apply (a conflict, not an error), then +1.
         let (state, conflicts): (Counter, _) = replay(&bs);
         assert_eq!(state, Counter(5));
         assert_eq!(conflicts.len(), 1);
-        assert_eq!((conflicts[0].batch, conflicts[0].op), (Uuid::from_u128(3), -5));
+        assert_eq!(
+            (conflicts[0].batch, conflicts[0].op),
+            (Uuid::from_u128(3), -5)
+        );
     }
 
     #[test]

@@ -84,11 +84,22 @@ impl Signer {
     }
 
     pub fn trusted(&self, name: &str) -> TrustedKey {
-        TrustedKey { id: self.key_id(), public: self.public_hex(), name: name.to_string() }
+        TrustedKey {
+            id: self.key_id(),
+            public: self.public_hex(),
+            name: name.to_string(),
+        }
     }
 
-    pub fn sign<O: Serialize + DeserializeOwned>(&self, domain: &[u8], batch: &Batch<O>) -> BatchSig {
-        BatchSig { key: self.key_id(), sig: hex::encode(self.0.sign(&message(domain, batch)).to_bytes()) }
+    pub fn sign<O: Serialize + DeserializeOwned>(
+        &self,
+        domain: &[u8],
+        batch: &Batch<O>,
+    ) -> BatchSig {
+        BatchSig {
+            key: self.key_id(),
+            sig: hex::encode(self.0.sign(&message(domain, batch)).to_bytes()),
+        }
     }
 }
 
@@ -114,12 +125,24 @@ pub enum Verdict {
     Invalid(String),
 }
 
-pub fn verify<O: Serialize + DeserializeOwned>(domain: &[u8], batch: &Batch<O>, sig: Option<&BatchSig>, keys: &TrustedKeys) -> Verdict {
-    let Some(sig) = sig else { return Verdict::Unsigned };
-    let Some(key) = keys.keys.iter().find(|k| k.id == sig.key) else {
-        return Verdict::Invalid(format!("signed by key {}, which isn't trusted here", sig.key));
+pub fn verify<O: Serialize + DeserializeOwned>(
+    domain: &[u8],
+    batch: &Batch<O>,
+    sig: Option<&BatchSig>,
+    keys: &TrustedKeys,
+) -> Verdict {
+    let Some(sig) = sig else {
+        return Verdict::Unsigned;
     };
-    let public: Option<[u8; 32]> = hex::decode(&key.public).ok().and_then(|b| b.try_into().ok());
+    let Some(key) = keys.keys.iter().find(|k| k.id == sig.key) else {
+        return Verdict::Invalid(format!(
+            "signed by key {}, which isn't trusted here",
+            sig.key
+        ));
+    };
+    let public: Option<[u8; 32]> = hex::decode(&key.public)
+        .ok()
+        .and_then(|b| b.try_into().ok());
     let Some(vk) = public.and_then(|b| VerifyingKey::from_bytes(&b).ok()) else {
         return Verdict::Invalid(format!("trusted key {} is malformed", key.id));
     };
@@ -129,7 +152,9 @@ pub fn verify<O: Serialize + DeserializeOwned>(domain: &[u8], batch: &Batch<O>, 
     };
     match vk.verify_strict(&message(domain, batch), &signature) {
         Ok(()) => Verdict::Signed(key.name.clone()),
-        Err(_) => Verdict::Invalid("signature doesn't match the batch (edited after signing?)".into()),
+        Err(_) => {
+            Verdict::Invalid("signature doesn't match the batch (edited after signing?)".into())
+        }
     }
 }
 
@@ -150,7 +175,10 @@ impl SigDir {
 
     pub fn write(&self, batch: &Uuid, sig: &BatchSig) -> Result<()> {
         fs::create_dir_all(&self.dir)?;
-        write_atomic(&self.dir.join(format!("{batch}.sig")), &serde_json::to_vec_pretty(sig)?)
+        write_atomic(
+            &self.dir.join(format!("{batch}.sig")),
+            &serde_json::to_vec_pretty(sig)?,
+        )
     }
 
     pub fn read(&self) -> Result<BTreeMap<Uuid, BatchSig>> {
@@ -158,7 +186,10 @@ impl SigDir {
         if self.dir.is_dir() {
             for entry in fs::read_dir(&self.dir)? {
                 let path = entry?.path();
-                let id = path.file_stem().and_then(|s| s.to_str()).and_then(|s| s.parse::<Uuid>().ok());
+                let id = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .and_then(|s| s.parse::<Uuid>().ok());
                 if let (Some(id), Some("sig")) = (id, path.extension().and_then(|e| e.to_str())) {
                     out.insert(id, serde_json::from_slice(&fs::read(&path)?)?);
                 }
@@ -178,18 +209,37 @@ mod tests {
     #[test]
     fn signs_and_verifies_with_a_domain() {
         let hub = Signer::from_seed([7; 32]);
-        let keys = TrustedKeys { keys: vec![hub.trusted("hub")] };
+        let keys = TrustedKeys {
+            keys: vec![hub.trusted("hub")],
+        };
         let b = batch(1, None, vec![1]);
         let sig = hub.sign(DOMAIN, &b);
-        assert_eq!(verify(DOMAIN, &b, Some(&sig), &keys), Verdict::Signed("hub".into()));
+        assert_eq!(
+            verify(DOMAIN, &b, Some(&sig), &keys),
+            Verdict::Signed("hub".into())
+        );
         assert_eq!(verify(DOMAIN, &b, None, &keys), Verdict::Unsigned);
-        assert!(matches!(verify(b"other-v1\n", &b, Some(&sig), &keys), Verdict::Invalid(_)), "another domain");
+        assert!(
+            matches!(
+                verify(b"other-v1\n", &b, Some(&sig), &keys),
+                Verdict::Invalid(_)
+            ),
+            "another domain"
+        );
         let mut edited = b.clone();
         edited.header.author = "agent:sneaky".into();
-        assert!(matches!(verify(DOMAIN, &edited, Some(&sig), &keys), Verdict::Invalid(_)));
+        assert!(matches!(
+            verify(DOMAIN, &edited, Some(&sig), &keys),
+            Verdict::Invalid(_)
+        ));
         let other = Signer::from_seed([8; 32]);
-        assert!(matches!(verify(DOMAIN, &b, Some(&other.sign(DOMAIN, &b)), &keys), Verdict::Invalid(m) if m.contains("isn't trusted")));
-        assert_eq!(Signer::from_seed_hex(&hub.seed_hex()).unwrap().key_id(), hub.key_id());
+        assert!(
+            matches!(verify(DOMAIN, &b, Some(&other.sign(DOMAIN, &b)), &keys), Verdict::Invalid(m) if m.contains("isn't trusted"))
+        );
+        assert_eq!(
+            Signer::from_seed_hex(&hub.seed_hex()).unwrap().key_id(),
+            hub.key_id()
+        );
 
         let dir = tempfile::tempdir().unwrap();
         let sigs = SigDir::new(dir.path().join("sigs"));

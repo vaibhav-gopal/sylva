@@ -42,7 +42,10 @@ impl BatchDir {
             let path = entry?.path();
             if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
                 let text = fs::read_to_string(&path)?;
-                out.push(Batch::from_jsonl(&text).map_err(|e| Error::Invalid(format!("{}: {e}", path.display())))?);
+                out.push(
+                    Batch::from_jsonl(&text)
+                        .map_err(|e| Error::Invalid(format!("{}: {e}", path.display())))?,
+                );
             }
         }
         Ok(out)
@@ -82,6 +85,10 @@ mod tests {
         assert!(log.contains(&b.header.batch));
         assert_eq!(log.read::<i64>().unwrap(), vec![b]);
         std::fs::write(dir.path().join("log").join("broken.jsonl"), "not json").unwrap();
-        assert!(log.read::<i64>().unwrap_err().to_string().contains("broken.jsonl"));
+        assert!(log
+            .read::<i64>()
+            .unwrap_err()
+            .to_string()
+            .contains("broken.jsonl"));
     }
 }
