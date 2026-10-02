@@ -88,6 +88,54 @@ impl<'t, T, K: Key> Iterator for Lineage<'t, T, K> {
     }
 }
 
+/// A node found in the tree: its data, parent and children, read from its slot
+/// (walking from an entry to its children needs no lookups by key).
+pub struct Entry<'t, T, K: Key> {
+    tree: &'t Tree<T, K>,
+    slot: u32,
+}
+
+impl<T, K: Key> Clone for Entry<'_, T, K> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T, K: Key> Copy for Entry<'_, T, K> {}
+
+impl<'t, T, K: Key> Entry<'t, T, K> {
+    pub fn key(&self) -> K {
+        self.tree.s(self.slot).key
+    }
+
+    pub fn data(&self) -> &'t T {
+        &self.tree.s(self.slot).data
+    }
+
+    pub fn parent(&self) -> Option<K> {
+        self.tree.s(self.slot).parent.map(|p| self.tree.s(p).key)
+    }
+
+    /// The children's keys, in order.
+    pub fn children(&self) -> Keys<'t, T, K> {
+        Keys {
+            tree: self.tree,
+            list: self.tree.s(self.slot).children.iter(),
+        }
+    }
+
+    /// The children as entries, in order.
+    pub fn child_entries(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = Entry<'t, T, K>> + ExactSizeIterator + 't {
+        let tree = self.tree;
+        tree.s(self.slot)
+            .children
+            .iter()
+            .map(move |&c| Entry { tree, slot: c })
+    }
+}
+
 /// A depth-first, preorder walk; `keep` decides which nodes (with their subtrees) are visited.
 pub struct Preorder<'t, T, K: Key, F> {
     tree: &'t Tree<T, K>,
@@ -181,6 +229,20 @@ impl<T, K: Key> Tree<T, K> {
             tree: self,
             list: self.roots.iter(),
         }
+    }
+
+    /// A node with its place in the tree, for walks that read data, parent and children together.
+    pub fn entry(&self, key: &K) -> Option<Entry<'_, T, K>> {
+        self.index.get(key).map(|&slot| Entry { tree: self, slot })
+    }
+
+    /// The roots as entries, in order.
+    pub fn root_entries(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = Entry<'_, T, K>> + ExactSizeIterator + '_ {
+        self.roots
+            .iter()
+            .map(move |&slot| Entry { tree: self, slot })
     }
 
     /// The node's children, in order (none for a key that isn't here).
@@ -438,6 +500,13 @@ mod tests {
             "skips 3 and below"
         );
         assert!(t.is_ancestor(&1, &4) && !t.is_ancestor(&4, &1) && !t.is_ancestor(&4, &4));
+        let e = t.entry(&2).unwrap();
+        assert_eq!((e.key(), *e.data(), e.parent()), (2, "Lower-wear", Some(1)));
+        assert_eq!(
+            e.child_entries().map(|c| *c.data()).collect::<Vec<_>>(),
+            ["Jeans"]
+        );
+        assert_eq!(t.root_entries().map(|r| r.key()).collect::<Vec<_>>(), [1]);
         assert!(matches!(
             t.clone().insert(9, Some(42), None, "x"),
             Err(Error::NotFound(_))
