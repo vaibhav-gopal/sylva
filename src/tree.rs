@@ -14,7 +14,8 @@ struct Slot<T, K> {
     key: K,
     data: T,
     parent: Option<u32>,
-    children: Vec<u32>,
+    /// Each child's key and slot, in order (the key is kept so listing children reads no other slot).
+    children: Vec<(K, u32)>,
 }
 
 #[derive(Clone, Debug)]
@@ -22,7 +23,7 @@ pub struct Tree<T, K: Key = uuid::Uuid> {
     slots: Vec<Option<Slot<T, K>>>,
     free: Vec<u32>,
     index: BTreeMap<K, u32>,
-    roots: Vec<u32>,
+    roots: Vec<(K, u32)>,
 }
 
 impl<T, K: Key> Default for Tree<T, K> {
@@ -38,15 +39,24 @@ impl<T, K: Key> Default for Tree<T, K> {
 
 /// Keys of a list of slots (children or roots), in order.
 pub struct Keys<'t, T, K: Key> {
-    tree: &'t Tree<T, K>,
-    list: std::slice::Iter<'t, u32>,
+    list: std::slice::Iter<'t, (K, u32)>,
+    tree: std::marker::PhantomData<&'t Tree<T, K>>,
+}
+
+impl<'t, T, K: Key> Keys<'t, T, K> {
+    fn of(list: &'t [(K, u32)]) -> Self {
+        Keys {
+            list: list.iter(),
+            tree: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<T, K: Key> Clone for Keys<'_, T, K> {
     fn clone(&self) -> Self {
         Keys {
-            tree: self.tree,
             list: self.list.clone(),
+            tree: std::marker::PhantomData,
         }
     }
 }
@@ -55,7 +65,7 @@ impl<T, K: Key> Iterator for Keys<'_, T, K> {
     type Item = K;
 
     fn next(&mut self) -> Option<K> {
-        self.list.next().map(|&i| self.tree.s(i).key)
+        self.list.next().map(|&(k, _)| k)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -65,7 +75,7 @@ impl<T, K: Key> Iterator for Keys<'_, T, K> {
 
 impl<T, K: Key> DoubleEndedIterator for Keys<'_, T, K> {
     fn next_back(&mut self) -> Option<K> {
-        self.list.next_back().map(|&i| self.tree.s(i).key)
+        self.list.next_back().map(|&(k, _)| k)
     }
 }
 
@@ -118,10 +128,7 @@ impl<'t, T, K: Key> Entry<'t, T, K> {
 
     /// The children's keys, in order.
     pub fn children(&self) -> Keys<'t, T, K> {
-        Keys {
-            tree: self.tree,
-            list: self.tree.s(self.slot).children.iter(),
-        }
+        Keys::of(&self.tree.s(self.slot).children)
     }
 
     /// The children as entries, in order.
@@ -132,7 +139,7 @@ impl<'t, T, K: Key> Entry<'t, T, K> {
         tree.s(self.slot)
             .children
             .iter()
-            .map(move |&c| Entry { tree, slot: c })
+            .map(move |&(_, slot)| Entry { tree, slot })
     }
 }
 
@@ -149,9 +156,8 @@ impl<'t, T, K: Key, F: FnMut(&K, &T) -> bool> Iterator for Preorder<'t, T, K, F>
     fn next(&mut self) -> Option<Self::Item> {
         let i = self.stack.pop()?;
         let s = self.tree.s(i);
-        for &c in s.children.iter().rev() {
-            let child = self.tree.s(c);
-            if (self.keep)(&child.key, &child.data) {
+        for &(key, c) in s.children.iter().rev() {
+            if (self.keep)(&key, &self.tree.s(c).data) {
                 self.stack.push(c);
             }
         }
@@ -195,14 +201,14 @@ impl<T, K: Key> Tree<T, K> {
             .ok_or_else(|| Error::NotFound(format!("node {key}")))
     }
 
-    fn list(&self, parent: Option<u32>) -> &Vec<u32> {
+    fn list(&self, parent: Option<u32>) -> &Vec<(K, u32)> {
         match parent {
             Some(p) => &self.s(p).children,
             None => &self.roots,
         }
     }
 
-    fn list_mut(&mut self, parent: Option<u32>) -> &mut Vec<u32> {
+    fn list_mut(&mut self, parent: Option<u32>) -> &mut Vec<(K, u32)> {
         match parent {
             Some(p) => &mut self.s_mut(p).children,
             None => &mut self.roots,
@@ -225,10 +231,7 @@ impl<T, K: Key> Tree<T, K> {
     }
 
     pub fn roots(&self) -> Keys<'_, T, K> {
-        Keys {
-            tree: self,
-            list: self.roots.iter(),
-        }
+        Keys::of(&self.roots)
     }
 
     /// A node with its place in the tree, for walks that read data, parent and children together.
@@ -242,18 +245,14 @@ impl<T, K: Key> Tree<T, K> {
     ) -> impl DoubleEndedIterator<Item = Entry<'_, T, K>> + ExactSizeIterator + '_ {
         self.roots
             .iter()
-            .map(move |&slot| Entry { tree: self, slot })
+            .map(move |&(_, slot)| Entry { tree: self, slot })
     }
 
     /// The node's children, in order (none for a key that isn't here).
     pub fn children(&self, key: &K) -> Keys<'_, T, K> {
-        let list: &[u32] = match self.index.get(key) {
-            Some(&i) => &self.s(i).children,
-            None => &[],
-        };
-        Keys {
-            tree: self,
-            list: list.iter(),
+        match self.index.get(key) {
+            Some(&i) => Keys::of(&self.s(i).children),
+            None => Keys::of(&[]),
         }
     }
 
@@ -272,7 +271,9 @@ impl<T, K: Key> Tree<T, K> {
     /// Where the node sits among its siblings.
     pub fn position(&self, key: &K) -> Option<usize> {
         let i = *self.index.get(key)?;
-        self.list(self.s(i).parent).iter().position(|&x| x == i)
+        self.list(self.s(i).parent)
+            .iter()
+            .position(|&(_, x)| x == i)
     }
 
     /// Adds a node under `parent` (a root for `None`) at `index`, or last.
@@ -308,7 +309,7 @@ impl<T, K: Key> Tree<T, K> {
                 (self.slots.len() - 1) as u32
             }
         };
-        self.list_mut(p).insert(at, i);
+        self.list_mut(p).insert(at, (key, i));
         self.index.insert(key, i);
         Ok(())
     }
@@ -327,20 +328,20 @@ impl<T, K: Key> Tree<T, K> {
         let from = self
             .list(old)
             .iter()
-            .position(|&x| x == i)
+            .position(|&(_, x)| x == i)
             .expect("a node is in its parent's list");
         self.list_mut(old).remove(from);
         let len = self.list(p).len();
         let at = index.unwrap_or(len);
         if at > len || (old == p && at == from) {
-            self.list_mut(old).insert(from, i);
+            self.list_mut(old).insert(from, (*key, i));
             return if at > len {
                 invalid("index out of range")
             } else {
                 Ok(false)
             };
         }
-        self.list_mut(p).insert(at, i);
+        self.list_mut(p).insert(at, (*key, i));
         self.s_mut(i).parent = p;
         Ok(true)
     }
@@ -349,7 +350,7 @@ impl<T, K: Key> Tree<T, K> {
     pub fn remove(&mut self, key: &K) -> Option<Vec<(K, T)>> {
         let i = *self.index.get(key)?;
         let parent = self.s(i).parent;
-        self.list_mut(parent).retain(|&x| x != i);
+        self.list_mut(parent).retain(|&(_, x)| x != i);
         let mut out = Vec::new();
         let mut stack = vec![i];
         while let Some(n) = stack.pop() {
@@ -358,7 +359,7 @@ impl<T, K: Key> Tree<T, K> {
                 .expect("indexed slots are live");
             self.index.remove(&s.key);
             self.free.push(n);
-            stack.extend(s.children.iter().rev());
+            stack.extend(s.children.iter().rev().map(|&(_, c)| c));
             out.push((s.key, s.data));
         }
         Some(out)
@@ -424,8 +425,8 @@ impl<T, K: Key> Tree<T, K> {
             .roots
             .iter()
             .rev()
-            .copied()
-            .filter(|&r| keep(&self.s(r).key, &self.s(r).data))
+            .filter(|&&(k, r)| keep(&k, &self.s(r).data))
+            .map(|&(_, r)| r)
             .collect();
         Preorder {
             tree: self,

@@ -45,6 +45,8 @@ struct EdgeSlot<E, K> {
     key: K,
     from: u32,
     to: u32,
+    /// The ends' keys, so reading an edge reads no node slot.
+    ends: (K, K),
     data: E,
 }
 
@@ -189,8 +191,8 @@ impl<N, E, K: Key> Graph<N, E, K> {
         let e = self.es(i);
         EdgeRef {
             key: e.key,
-            from: self.ns(e.from).key,
-            to: self.ns(e.to).key,
+            from: e.ends.0,
+            to: e.ends.1,
             data: &e.data,
         }
     }
@@ -276,6 +278,7 @@ impl<N, E, K: Key> Graph<N, E, K> {
             key,
             from: f,
             to: t,
+            ends: (from, to),
             data,
         };
         let ei = match self.free_edges.pop() {

@@ -295,8 +295,14 @@ impl Tree {
         self.nodes.get(id).is_some_and(|n| n.retired.is_none())
     }
 
-    pub fn active_children(&self, id: &NodeId) -> impl Iterator<Item = NodeId> + '_ {
-        self.children(id).filter(|c| self.is_active(c))
+    /// Ordered children that aren't retired (read from their slots, no lookups by id).
+    pub fn active_children(&self, id: &NodeId) -> impl DoubleEndedIterator<Item = NodeId> + '_ {
+        self.nodes
+            .entry(id)
+            .into_iter()
+            .flat_map(|e| e.child_entries())
+            .filter(|c| c.data().retired.is_none())
+            .map(|c| c.key())
     }
 
     /// Path of names from the root, e.g. `["Clothing", "Lower-wear", "Jeans"]`.
