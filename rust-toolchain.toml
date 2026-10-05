@@ -1,3 +1,5 @@
 [toolchain]
 channel = "1.98"
 components = ["clippy", "rustfmt", "rust-analyzer"]
+# The structures build for wasm without std: `cargo build --no-default-features --target wasm32-unknown-unknown`.
+targets = ["wasm32-unknown-unknown"]

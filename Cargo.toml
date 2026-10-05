@@ -6,11 +6,14 @@ license = "UNLICENSED"
 description = "Graphs and trees that remember: general-purpose structures with a versioned op log on top"
 
 [features]
-default = []
+default = ["std"]
+# The standard library. Without it the structures (graph, tree, forest) need only `alloc`, for
+# no_std and wasm targets; the log and the knowledge model need it.
+std = ["thiserror/std"]
 # Serialization for the log and the knowledge model.
-serde = ["dep:serde", "uuid/serde"]
+serde = ["std", "dep:serde", "uuid?/serde"]
 # Batches, causal order, replay, history with snapshots, batch files and the hash chain.
-log = ["serde", "dep:serde_json", "dep:sha2", "dep:hex"]
+log = ["std", "dep:uuid", "serde", "dep:serde_json", "dep:sha2", "dep:hex"]
 # Ed25519 signatures over batches (domain-separated).
 sign = ["log", "dep:ed25519-dalek"]
 # The hash chain stored in SQLite.
@@ -18,13 +21,13 @@ sqlite = ["log", "dep:rusqlite"]
 # Encryption at rest for a stored log (XChaCha20-Poly1305, keys derived per application).
 crypt = ["log", "dep:chacha20poly1305", "dep:hmac", "dep:base64"]
 # Typed property graphs and catalog trees: schemas, stated/observed facts, references, queries, diagrams.
-knowledge = ["serde", "dep:serde_json"]
+knowledge = ["std", "dep:uuid", "serde", "dep:serde_json"]
 # TypeScript types for the knowledge model (ts-rs).
 ts = ["knowledge", "dep:ts-rs"]
 
 [dependencies]
-uuid = { version = "1", features = ["v7"] }
-thiserror = "2"
+uuid = { version = "1", features = ["v7"], optional = true }
+thiserror = { version = "2", default-features = false }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha2 = { version = "0.10", optional = true }

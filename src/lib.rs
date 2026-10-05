@@ -16,6 +16,14 @@
 //!   were stated or observed, references to entities elsewhere, queries and
 //!   diagrams.
 
+//!
+//! Without the default `std` feature the structures and the forest need only
+//! `alloc`, so they build for no_std and wasm targets.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
+
 pub mod error;
 pub mod forest;
 pub mod graph;
@@ -30,6 +38,6 @@ pub mod knowledge;
 pub use error::{Error, Result};
 
 /// A key for nodes and edges: small, copyable and totally ordered (iteration follows it).
-pub trait Key: Copy + Ord + std::hash::Hash + std::fmt::Debug + std::fmt::Display {}
+pub trait Key: Copy + Ord + core::hash::Hash + core::fmt::Debug + core::fmt::Display {}
 
-impl<T: Copy + Ord + std::hash::Hash + std::fmt::Debug + std::fmt::Display> Key for T {}
+impl<T: Copy + Ord + core::hash::Hash + core::fmt::Debug + core::fmt::Display> Key for T {}

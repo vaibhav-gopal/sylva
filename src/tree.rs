@@ -4,7 +4,8 @@
 //! parent links and ordered child lists. Ancestors, paths and subtree walks
 //! are iterators over slots: no allocation per step, no lookups by key.
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+use alloc::{format, vec, vec::Vec};
 
 use crate::error::invalid;
 use crate::{Error, Key, Result};
@@ -19,7 +20,7 @@ struct Slot<T, K> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Tree<T, K: Key = uuid::Uuid> {
+pub struct Tree<T, K: Key> {
     slots: Vec<Option<Slot<T, K>>>,
     free: Vec<u32>,
     index: BTreeMap<K, u32>,
@@ -39,15 +40,15 @@ impl<T, K: Key> Default for Tree<T, K> {
 
 /// Keys of a list of slots (children or roots), in order.
 pub struct Keys<'t, T, K: Key> {
-    list: std::slice::Iter<'t, (K, u32)>,
-    tree: std::marker::PhantomData<&'t Tree<T, K>>,
+    list: core::slice::Iter<'t, (K, u32)>,
+    tree: core::marker::PhantomData<&'t Tree<T, K>>,
 }
 
 impl<'t, T, K: Key> Keys<'t, T, K> {
     fn of(list: &'t [(K, u32)]) -> Self {
         Keys {
             list: list.iter(),
-            tree: std::marker::PhantomData,
+            tree: core::marker::PhantomData,
         }
     }
 }
@@ -56,7 +57,7 @@ impl<T, K: Key> Clone for Keys<'_, T, K> {
     fn clone(&self) -> Self {
         Keys {
             list: self.list.clone(),
-            tree: std::marker::PhantomData,
+            tree: core::marker::PhantomData,
         }
     }
 }

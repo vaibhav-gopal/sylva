@@ -6,7 +6,8 @@
 //! edge key, so neighbours, degrees and "is there already an edge from a to
 //! b" cost the node's degree, not the size of the graph.
 
-use std::collections::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
+use alloc::{format, vec, vec::Vec};
 
 use crate::error::invalid;
 use crate::{Error, Key, Result};
@@ -77,7 +78,7 @@ pub struct Reached<K> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Graph<N, E, K: Key = uuid::Uuid> {
+pub struct Graph<N, E, K: Key> {
     nodes: Vec<Option<NodeSlot<N, K>>>,
     free_nodes: Vec<u32>,
     node_index: BTreeMap<K, u32>,
@@ -519,13 +520,13 @@ impl<N, E, K: Key> Graph<N, E, K> {
 
     /// The nodes in an order where every edge points forward (ties broken by
     /// key), or the nodes that are on or behind a cycle.
-    pub fn topological_order(&self) -> std::result::Result<Vec<K>, Vec<K>> {
+    pub fn topological_order(&self) -> core::result::Result<Vec<K>, Vec<K>> {
         let mut indegree: Vec<usize> = self
             .nodes
             .iter()
             .map(|n| n.as_ref().map_or(0, |n| n.inc.len()))
             .collect();
-        let mut ready: std::collections::BTreeSet<(K, u32)> = self
+        let mut ready: BTreeSet<(K, u32)> = self
             .node_index
             .iter()
             .filter(|(_, &i)| indegree[i as usize] == 0)
@@ -545,7 +546,7 @@ impl<N, E, K: Key> Graph<N, E, K> {
         if out.len() == self.node_count() {
             Ok(out)
         } else {
-            let done: std::collections::BTreeSet<K> = out.into_iter().collect();
+            let done: BTreeSet<K> = out.into_iter().collect();
             Err(self.node_keys().filter(|k| !done.contains(k)).collect())
         }
     }
@@ -642,7 +643,11 @@ mod tests {
         nodes.sort();
         assert_eq!(nodes, (1..n).collect::<Vec<_>>());
         let path = g.shortest_path(&0, &(n - 1), Dir::Out, usize::MAX, |_| true);
-        assert_eq!(path.map(|p| p.len()), Some(100), "two ahead each step, then one");
+        assert_eq!(
+            path.map(|p| p.len()),
+            Some(100),
+            "two ahead each step, then one"
+        );
         assert_eq!(
             g.shortest_path(&0, &(n - 1), Dir::Out, 99, |_| true),
             None,

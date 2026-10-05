@@ -12,6 +12,8 @@ Sylva is a small Rust library with three layers:
 
 Extra features: `sign` (Ed25519 signatures over batches), `sqlite` (the hash chain in SQLite), `crypt`
 (encryption at rest for a stored log), `ts` (TypeScript types for the knowledge model, via ts-rs).
+`std` is on by default; without it (`default-features = false`) the structures need only `alloc` and
+build for no_std and wasm targets, with `thiserror` as their one dependency.
 
 It was extracted from [Alfred](../alfred); Alfred and [Tend](../tend) build on it. The design is in
 [docs/DESIGN.md](docs/DESIGN.md).
@@ -110,6 +112,7 @@ and Mermaid, DOT and D2 rendering.
 cargo test --all-features
 cargo clippy --all-features --all-targets -- -D warnings
 cargo bench --all-features        # benches/: structures, forest and log
+cargo build --no-default-features --target wasm32-unknown-unknown   # the structures without std
 ```
 
 Status: in use by Alfred and Tend, not published. The op JSON of the knowledge model is a stored-data contract (it is

@@ -44,6 +44,8 @@
 //!
 //! tend: sylva/Structures/Forest
 
+use alloc::{format, vec::Vec};
+
 use crate::error::invalid;
 use crate::{Error, Result};
 
@@ -762,6 +764,7 @@ impl<T: Clone + Default> Column<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     /// a(b(d, e), c), r
     fn sample() -> (Forest, [Id; 6]) {

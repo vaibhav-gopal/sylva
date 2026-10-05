@@ -93,7 +93,7 @@ pub struct Tree {
     pub name: String,
     /// What the tree is for, e.g. `tend`, `catalog`, `areas`, `accounts`.
     pub purpose: String,
-    nodes: Forest<Node>,
+    nodes: Forest<Node, NodeId>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -286,7 +286,7 @@ impl Tree {
     }
 
     /// The structure itself, for walks (lineage, subtrees, preorder).
-    pub fn forest(&self) -> &Forest<Node> {
+    pub fn forest(&self) -> &Forest<Node, NodeId> {
         &self.nodes
     }
 

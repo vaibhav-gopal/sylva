@@ -145,7 +145,11 @@ impl Schema {
         if self.edges.contains_key(name) {
             return (name, false);
         }
-        match self.edges.iter().find(|(_, t)| t.inverse.as_deref() == Some(name)) {
+        match self
+            .edges
+            .iter()
+            .find(|(_, t)| t.inverse.as_deref() == Some(name))
+        {
             Some((ty, _)) => (ty.as_str(), true),
             None => (name, false),
         }
@@ -176,7 +180,7 @@ pub struct Graph {
     /// `projects`, `schemas`, `personal` …
     pub scope: String,
     pub schema: Option<Schema>,
-    inner: Structure<Node, Edge>,
+    inner: Structure<Node, Edge, Uuid>,
 }
 
 impl Graph {
@@ -227,7 +231,7 @@ impl Graph {
     }
 
     /// The structure itself, for walks and other algorithms.
-    pub fn structure(&self) -> &Structure<Node, Edge> {
+    pub fn structure(&self) -> &Structure<Node, Edge, Uuid> {
         &self.inner
     }
 
@@ -1066,7 +1070,11 @@ mod tests {
         .unwrap();
         let s = gs.graphs[&g].schema.as_ref().unwrap();
         assert_eq!(s.edge_name("calls"), ("calls", false));
-        assert_eq!(s.edge_name("called_by"), ("calls", true), "an edge read backwards");
+        assert_eq!(
+            s.edge_name("called_by"),
+            ("calls", true),
+            "an edge read backwards"
+        );
         assert_eq!(s.edge_name("other"), ("other", false));
         let add = |gs: &mut Graphs, ty: &str, p: Value| {
             let id = Uuid::now_v7();

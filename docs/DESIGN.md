@@ -12,7 +12,8 @@ for how it works and why. The README is the short version.
 - A log layer that any application state can sit on: changes are ops, state is a replay, history merges.
 - Determinism everywhere: the same ops give the same state, byte for byte, on every machine. Hashes,
   signatures and diffs depend on it.
-- Pure Rust (SQLite is an optional, bundled feature), so it builds for desktop, server and iOS.
+- Pure Rust (SQLite is an optional, bundled feature), so it builds for desktop, server and iOS; without
+  the default `std` feature the structures need only `alloc`, so they build for no_std and wasm too.
 - At least the performance of the code it replaced (Alfred's, measured in
   `alfred/docs/benchmarks/baseline.md`), checked by benchmarks rather than assumed.
 
@@ -57,7 +58,8 @@ Graph and Tree keep their items in a `Vec` of slots (with a free list) and find 
 - lookups by key are `O(log n)`, and everything inside a walk uses slot numbers (`O(1)`);
 - removed slots are reused, and `PartialEq` compares content, not layout.
 
-`K` is any `Copy + Ord + Hash + Debug + Display` type; Alfred uses UUIDv7.
+`K` is any `Copy + Ord + Hash + Debug + Display` type, and the caller always names it (there is no
+default); Alfred, Tend and the knowledge model use UUIDv7.
 
 ### 3.2 Graph
 
@@ -218,6 +220,8 @@ behaviour is pinned. Also pinned: the chain's hash encoding, and the written-out
 | Decision | Why |
 |---|---|
 | One crate with features, not five | Splits only pay where consumers need different dependencies; features handle that |
+| `uuid` only with `log` and `knowledge`; no default key type | A default key that changed with a feature would break a crate when another one in the build turned the feature on |
+| A default `std` feature; the structures need only `alloc` | So a UI on wasm or an embedded target gets the structures without the log's dependencies |
 | No separate signing crate | Signing is a property of batches; key custody belongs to the application |
 | Ordered `BTreeMap` index, not a hash map | Deterministic iteration with no extra sorting, and no hasher dependency |
 | Adjacency sorted by edge key | Same order as a scan by key, so results didn't change when the scan went away |
