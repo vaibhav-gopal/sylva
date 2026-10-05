@@ -1,0 +1,26 @@
+# Clippy and the tests under each feature set, and the structures built for wasm32 without std.
+# The toolchain, its components and the wasm32 target come from rust-toolchain.toml: rustup on the
+# runner reads it when cargo first runs, so no step installs a toolchain of its own.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["--all-features", "", "--no-default-features"]
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo clippy --all-targets ${{ matrix.features }} -- -D warnings
+      - run: cargo test ${{ matrix.features }}
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo build --no-default-features --target wasm32-unknown-unknown
