@@ -49,6 +49,7 @@ benches/            structures, log (divan)
 ## 3. Structures
 
 ### 3.1 Keys and storage
+
 Both structures keep their items in a `Vec` of slots (with a free list) and find them through a
 `BTreeMap<K, u32>` from key to slot. So:
 - iteration follows the key order, never the order of insertion or the slot layout (determinism);
@@ -58,6 +59,7 @@ Both structures keep their items in a `Vec` of slots (with a free list) and find
 `K` is any `Copy + Ord + Hash + Debug + Display` type; Alfred uses UUIDv7.
 
 ### 3.2 Graph
+
 Each node keeps its outgoing and incoming edges as lists of `(edge key, edge slot)`, sorted by edge key.
 That keeps per-node iteration in key order (the same order a scan of all edges by key would give), so
 replacing a full scan with the adjacency list changes no result.
@@ -74,6 +76,7 @@ replacing a full scan with the adjacency list changes no result.
 `Dir::Both` merges the two sorted lists; a self-loop appears once.
 
 ### 3.3 Tree
+
 An ordered forest: roots in order, each node with a parent and ordered children (each child's key next
 to its slot, so listing children reads no other slot). `entry` and `root_entries` hand out an `Entry`
 (key, data, parent, child entries) for walks that read a node and its children together.
@@ -85,12 +88,14 @@ is already where it was asked to go, so callers can report "doesn't change anyth
 ## 4. The log layer
 
 ### 4.1 Ops, batches and projections
+
 A **projection** is any state with `apply(op, meta) -> Result`. A **batch** is ops written together,
 with a header: `batch` (UUIDv7), `after` (the newest batch the author had seen), `author`, `at` (ms)
 and an optional `message`. The JSONL form (header line, then one op per line) is canonical: it is
 what signatures cover, and line endings don't change it.
 
 ### 4.2 Causal order
+
 `order` places each batch after the one it names in `after`. Among batches ready at the same time, the
 smaller id comes first. A batch whose `after` isn't present (the first, or one from an unmerged branch)
 is a root. The order is the same for any set of batches in any input order, which is what makes
@@ -98,16 +103,19 @@ merging two directories of batch files safe. A corrupt `after` cycle is appended
 than lost.
 
 ### 4.3 Conflicts are data
+
 `replay` never fails. An op that doesn't apply (typically after a merge, when two branches changed the
 same thing) becomes a `Conflict { batch, index, op, reason }` for a person to resolve.
 
 ### 4.4 History
+
 `History` keeps the replayed state current. A batch whose `after` is the head (the usual case) applies
 alone. Any other batch re-orders the history and replays from the last snapshot before the first
 position that changed. Snapshots are taken every `every` batches, so `at(step)` costs one clone and at
 most `every` batches of replay.
 
 ### 4.5 The hash chain
+
 For a single writer (an application's own store), `chain` seals ops in sequence: each op's hash covers
 `{seq, id, batch, parent, ts, actor, op}` as JSON in that field order, with `parent` the previous op's
 hash. `check` and `replay` detect gaps, broken links and edited ops. The encoding is pinned by a test,
@@ -115,6 +123,7 @@ because every existing chain depends on it. `sqlite::ChainLog` stores one row pe
 through a `Codec`, which gets the op's hash so an encrypting codec can bind each payload to its row.
 
 ### 4.5a Encryption at rest
+
 `crypt` (feature `crypt`) is that codec. One random `MasterKey` per store; the data key is derived with
 HMAC-SHA256 as `<app>/v1/data`, so applications sharing a master key never share a data key. Each op is
 sealed with XChaCha20-Poly1305, its hash as associated data (a payload moved to another row fails to open),
@@ -123,6 +132,7 @@ can turn encryption on in place. The format is Alfred's, byte for byte, so its s
 without converting anything. Where the master key lives is the application's business.
 
 ### 4.6 Signatures
+
 `sign::Signer` signs `domain || batch.to_jsonl()`. The domain is the caller's (Tend uses
 `alfred-tend-batch-v1\n`, kept as-is so existing signatures stay valid). `verify` gives `Signed(name)`,
 `Unsigned` or `Invalid(reason)` against a set of trusted keys. Key custody (where the private key
@@ -131,6 +141,7 @@ lives) is the application's job.
 ## 5. The knowledge model
 
 ### 5.1 Property graphs
+
 Nodes and edges have a string type and JSON props. Every prop, node and edge records its source: stated
 (by a person or an agent) or observed (by a named scanner). An observation never overwrites or removes
 what was stated, and a scanner can re-run any number of times. Schemas (optional, possibly `open`) list
@@ -143,12 +154,14 @@ and text; neighbours; paths; impact), `change` (name-based changes, so tools can
 with grouping and focus).
 
 ### 5.2 Catalog trees
+
 Nodes have a name (unique among active siblings, ignoring case), a kind (category, specifier, leaf), an
 optional description and attributes. Nothing is deleted: `retire` keeps the node with its reason,
 `split` and `merge` record what replaced what, and `restore` brings a node back. Attributes declared on
 a category are inherited by its descendants, which makes a tree a catalog schema.
 
 ### 5.3 Compatibility contract
+
 - **Op JSON is stored data**: Alfred's op log and every repo's `.tend/log` hold it. Field names, tags
   and enum spellings only change with a migration.
 - **Written-out state** (the JSON of a `Tree` or `Graph`) is an API contract. `Tree` and `Graph`

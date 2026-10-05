@@ -1,0 +1,2 @@
+{"batch":"01a10a4c-0ca3-70f4-8088-256ab6380530","after":"01a10a4b-cdce-72a2-82d1-d513612afb2f","author":"user","at":1791174118563,"message":"Extends vg-paradigms (rust) @ 06444df"}
+{"op":"doc.set","path":"extends.toml","text":"baseline = \"vg-paradigms\"\nrev = \"06444df\"\nprofiles = [\"rust\"]\nmodules = [\"op-log\"]\n"}
