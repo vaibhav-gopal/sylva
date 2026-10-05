@@ -1,0 +1,26 @@
+# cargo-deny policy: `cargo deny --workspace check advisories bans sources` (CI: .github/workflows/deny.yml).
+#
+# Licenses are not checked here: the project is licensed under a combo of the vg-paradigms baseline
+# (.tend/extends.toml), and `tend check` judges every shipping dependency's license against what that
+# combo's options allow. This file keeps the rest: security advisories, banned or duplicated crates,
+# and where crates come from.
+
+[graph]
+# dev-dependencies (examples, tests, benchmarks) never ship in a product
+exclude-dev = true
+all-features = true
+
+[advisories]
+# RustSec: known vulnerabilities fail the check; unmaintained crates only when we depend on them directly
+unmaintained = "workspace"
+
+[bans]
+# duplicate versions cost build time, not correctness
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+# crates.io only: a git or other registry dependency needs a deliberate exception here
+unknown-registry = "deny"
+unknown-git = "deny"
