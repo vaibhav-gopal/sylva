@@ -110,6 +110,51 @@ fn remove_sorted<K: Ord + Copy>(list: &mut Vec<(K, u32)>, key: &K) {
     }
 }
 
+/// The node slots a walk has reached: the first few in place (no allocation), then a bit per
+/// slot. So a short walk, such as one step from a node, costs what it reaches, and a longer
+/// one a 64th of the slot count at most on top: never a word per node of the graph.
+struct Seen {
+    few: [u32; FEW],
+    len: usize,
+    all: Vec<u64>,
+    slots: usize,
+}
+
+const FEW: usize = 32;
+
+impl Seen {
+    fn new(slots: usize) -> Self {
+        Seen {
+            few: [0; FEW],
+            len: 0,
+            all: Vec::new(),
+            slots,
+        }
+    }
+
+    /// Marks `slot`; false if it was marked already.
+    fn insert(&mut self, slot: u32) -> bool {
+        if self.all.is_empty() {
+            if self.few[..self.len].contains(&slot) {
+                return false;
+            }
+            if self.len < FEW {
+                self.few[self.len] = slot;
+                self.len += 1;
+                return true;
+            }
+            self.all = vec![0; self.slots.div_ceil(64)];
+            for s in self.few {
+                self.all[s as usize / 64] |= 1 << (s % 64);
+            }
+        }
+        let (word, bit) = (slot as usize / 64, 1u64 << (slot % 64));
+        let new = self.all[word] & bit == 0;
+        self.all[word] |= bit;
+        new
+    }
+}
+
 /// Merges two key-sorted edge lists; an edge in both (a self-loop) comes once, from `a`.
 struct Merge<'a, K> {
     a: &'a [(K, u32)],
@@ -395,8 +440,8 @@ impl<N, E, K: Key> Graph<N, E, K> {
         let Some(&s) = self.node_index.get(start) else {
             return Vec::new();
         };
-        let mut seen = vec![false; self.nodes.len()];
-        seen[s as usize] = true;
+        let mut seen = Seen::new(self.nodes.len());
+        seen.insert(s);
         let mut queue = VecDeque::from([(s, 0usize)]);
         let mut out = Vec::new();
         while let Some((node, d)) = queue.pop_front() {
@@ -409,8 +454,7 @@ impl<N, E, K: Key> Graph<N, E, K> {
                     continue;
                 }
                 let next = if forward { e.to } else { e.from };
-                if !seen[next as usize] {
-                    seen[next as usize] = true;
+                if seen.insert(next) {
                     out.push(Reached {
                         node: self.ns(next).key,
                         depth: d + 1,
@@ -436,38 +480,39 @@ impl<N, E, K: Key> Graph<N, E, K> {
         if f == t {
             return Some(Vec::new());
         }
-        // For each reached slot: the slot it came from and the edge slot taken.
-        let mut back: Vec<Option<(u32, u32)>> = vec![None; self.nodes.len()];
-        let mut seen = vec![false; self.nodes.len()];
-        seen[f as usize] = true;
-        let mut queue = VecDeque::from([(f, 0usize)]);
-        while let Some((node, d)) = queue.pop_front() {
-            if d == max_depth {
-                continue;
-            }
-            for (forward, ei) in self.step_slots(node, dir) {
-                let e = self.es(ei);
-                if !follow(&e.data) {
-                    continue;
-                }
-                let next = if forward { e.to } else { e.from };
-                if seen[next as usize] {
-                    continue;
-                }
-                seen[next as usize] = true;
-                back[next as usize] = Some((node, ei));
-                if next == t {
-                    let mut edges = vec![self.es(ei).key];
-                    let mut cur = node;
-                    while let Some((prev, e)) = back[cur as usize] {
-                        edges.push(self.es(e).key);
-                        cur = prev;
+        // The reached slots in breadth-first order (so it is also the queue): each with its
+        // depth, the entry it was reached from and the edge slot taken.
+        // (Slots number below u32::MAX, so a u32 holds any depth or entry index reached.)
+        let mut trail: Vec<(u32, u32, u32, u32)> = vec![(f, 0, 0, 0)];
+        let mut seen = Seen::new(self.nodes.len());
+        seen.insert(f);
+        let mut at = 0;
+        while let Some(&(node, d, _, _)) = trail.get(at) {
+            if (d as usize) < max_depth {
+                for (forward, ei) in self.step_slots(node, dir) {
+                    let e = self.es(ei);
+                    if !follow(&e.data) {
+                        continue;
                     }
-                    edges.reverse();
-                    return Some(edges);
+                    let next = if forward { e.to } else { e.from };
+                    if !seen.insert(next) {
+                        continue;
+                    }
+                    if next == t {
+                        let mut edges = vec![e.key];
+                        let mut i = at;
+                        while i != 0 {
+                            let (_, _, prev, edge) = trail[i];
+                            edges.push(self.es(edge).key);
+                            i = prev as usize;
+                        }
+                        edges.reverse();
+                        return Some(edges);
+                    }
+                    trail.push((next, d + 1, at as u32, ei));
                 }
-                queue.push_back((next, d + 1));
             }
+            at += 1;
         }
         None
     }
@@ -577,6 +622,32 @@ mod tests {
         );
         assert_eq!(g.degree(&2, Dir::Both), 3);
         assert_eq!(g.topological_order().unwrap()[..2], [1, 2]);
+    }
+
+    #[test]
+    fn long_walks_reach_each_node_once() {
+        // A ring of 200 nodes, each also linked two ahead: more than a walk tracks in place.
+        let mut g: Graph<(), (), u32> = Graph::new();
+        let n = 200;
+        for i in 0..n {
+            g.add_node(i, ()).unwrap();
+        }
+        for i in 0..n {
+            g.add_edge(2 * i, i, (i + 1) % n, ()).unwrap();
+            g.add_edge(2 * i + 1, i, (i + 2) % n, ()).unwrap();
+        }
+        let reached = g.walk(&0, Dir::Out, usize::MAX, |_| true);
+        let mut nodes: Vec<u32> = reached.iter().map(|r| r.node).collect();
+        assert_eq!(nodes.len(), n as usize - 1, "each node but the start, once");
+        nodes.sort();
+        assert_eq!(nodes, (1..n).collect::<Vec<_>>());
+        let path = g.shortest_path(&0, &(n - 1), Dir::Out, usize::MAX, |_| true);
+        assert_eq!(path.map(|p| p.len()), Some(100), "two ahead each step, then one");
+        assert_eq!(
+            g.shortest_path(&0, &(n - 1), Dir::Out, 99, |_| true),
+            None,
+            "too far for the depth"
+        );
     }
 
     #[test]

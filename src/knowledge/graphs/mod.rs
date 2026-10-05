@@ -497,7 +497,7 @@ impl Graphs {
                     return invalid(format!("graph {id} already exists"));
                 }
                 let name = text(name, "graph name")?;
-                if self.find(&name).is_some() {
+                if self.named(&name, None) {
                     return invalid(format!("a graph is already named '{name}'"));
                 }
                 self.graphs
@@ -506,11 +506,7 @@ impl Graphs {
             GraphOp::Update { id, name, scope } => {
                 let name = name.as_deref().map(|n| text(n, "graph name")).transpose()?;
                 if let Some(n) = &name {
-                    if self
-                        .graphs
-                        .values()
-                        .any(|g| g.id != *id && g.name.eq_ignore_ascii_case(n))
-                    {
+                    if self.named(n, Some(*id)) {
                         return invalid(format!("a graph is already named '{n}'"));
                     }
                 }
@@ -731,6 +727,13 @@ impl Graphs {
             .map(|g| g.id)
     }
 
+    /// Whether a graph other than `except` has this name (case-insensitive; never an id prefix).
+    fn named(&self, name: &str, except: Option<GraphId>) -> bool {
+        self.graphs
+            .values()
+            .any(|g| Some(g.id) != except && g.name.eq_ignore_ascii_case(name))
+    }
+
     fn graph_mut(&mut self, id: &GraphId) -> Result<&mut Graph> {
         self.graphs
             .get_mut(id)
@@ -858,6 +861,32 @@ mod tests {
 
     fn props(v: Value) -> BTreeMap<String, Value> {
         serde_json::from_value(v).unwrap()
+    }
+
+    #[test]
+    fn a_graph_name_is_never_taken_for_an_id_prefix() {
+        let mut gs = Graphs::default();
+        let first = Uuid::now_v7();
+        gs.apply(&GraphOp::Create {
+            id: first,
+            name: "Machines".into(),
+            scope: "machines".into(),
+        })
+        .unwrap();
+        let prefix = first.to_string()[..4].to_string();
+        gs.apply(&GraphOp::Create {
+            id: Uuid::now_v7(),
+            name: prefix.clone(),
+            scope: "machines".into(),
+        })
+        .unwrap();
+        assert!(gs
+            .apply(&GraphOp::Create {
+                id: Uuid::now_v7(),
+                name: prefix.to_uppercase(),
+                scope: "machines".into(),
+            })
+            .is_err());
     }
 
     #[test]

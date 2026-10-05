@@ -337,6 +337,20 @@ impl Tree {
 
     pub fn apply(&mut self, op: &TreeOp) -> Result<()> {
         match op {
+            // Several steps, any of which can fail: work on a copy, so a failure part way
+            // leaves the tree as it was (replay keeps the state an op leaves behind).
+            TreeOp::Split { .. } | TreeOp::Merge { .. } => {
+                let mut next = self.clone();
+                next.apply_steps(op)?;
+                *self = next;
+                Ok(())
+            }
+            _ => self.apply_steps(op),
+        }
+    }
+
+    fn apply_steps(&mut self, op: &TreeOp) -> Result<()> {
+        match op {
             TreeOp::Create { .. } => unreachable!("handled by Trees"),
             TreeOp::RenameTree { name, .. } => {
                 let name = text(name, "tree name")?;
@@ -882,6 +896,58 @@ mod tests {
             })
             .is_err());
         assert_eq!(t.t(), &before, "a failed move changes nothing");
+    }
+
+    #[test]
+    fn a_failed_split_or_merge_changes_nothing() {
+        let mut t = T::new();
+        let auth = t.add(None, "Auth", NodeKind::Category);
+        let login = t.add(Some(auth), "Login", NodeKind::Category);
+        let before = t.t().clone();
+        let part = |name: &str| NewNode {
+            id: Uuid::now_v7(),
+            name: name.into(),
+            kind: NodeKind::Leaf,
+        };
+        assert!(t
+            .op(TreeOp::Split {
+                tree: t.tree,
+                id: login,
+                parts: vec![part("Password"), part("password")],
+                reason: "two flows".into(),
+            })
+            .is_err());
+        assert_eq!(t.t(), &before, "the first part isn't left behind");
+
+        // Each merged node has an active child named "Phone": the second can't join the first.
+        let (a, b) = (
+            t.add(Some(auth), "SMS", NodeKind::Category),
+            t.add(Some(auth), "Voice", NodeKind::Category),
+        );
+        t.add(Some(a), "Phone", NodeKind::Leaf);
+        t.add(Some(b), "phone", NodeKind::Leaf);
+        let before = t.t().clone();
+        let clash = TreeOp::Merge {
+            tree: t.tree,
+            ids: vec![a, b],
+            into: NewNode {
+                id: Uuid::now_v7(),
+                name: "Codes".into(),
+                kind: NodeKind::Category,
+            },
+            reason: "one flow".into(),
+        };
+        assert!(t.op(clash).is_err());
+        assert_eq!(t.t(), &before, "nothing added, moved or retired");
+
+        let into_leaf = TreeOp::Merge {
+            tree: t.tree,
+            ids: vec![a, b],
+            into: part("Codes"),
+            reason: "one flow".into(),
+        };
+        assert!(t.op(into_leaf).is_err(), "a leaf can't take the children");
+        assert_eq!(t.t(), &before);
     }
 
     #[test]
