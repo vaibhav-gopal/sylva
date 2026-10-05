@@ -1,3 +1,8 @@
+//! The one error type every layer returns: a change that doesn't apply, something missing,
+//! a log that doesn't verify, or what serialization, IO and SQLite report.
+//!
+//! tend: sylva/Foundation
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// The change doesn't apply (it would break a rule, or changes nothing).
