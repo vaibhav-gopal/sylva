@@ -45,6 +45,10 @@ name = "structures"
 harness = false
 
 [[bench]]
+name = "forest"
+harness = false
+
+[[bench]]
 name = "log"
 harness = false
 required-features = ["log"]

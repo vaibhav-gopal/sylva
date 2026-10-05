@@ -6,7 +6,7 @@ Sylva is a small Rust library with three layers:
 
 | Layer | Feature | What it gives you |
 |---|---|---|
-| **Structures** | (always) | `Graph<N, E, K>` and `Tree<T, K>`: stable keys, dense storage, indexes, and iteration in key order |
+| **Structures** | (always) | `Graph<N, E, K>` and `Tree<T, K>`: stable keys, dense storage, indexes, and iteration in key order; `Forest`, a tree for hot paths |
 | **Log** | `log` | state as the replay of a log of ops: batches, causal order, conflicts as data, time travel, batch files, a hash chain |
 | **Knowledge** | `knowledge` | a typed property graph and a catalog tree built on the two, with schemas, stated vs observed facts, references, queries and diagrams |
 
@@ -38,6 +38,25 @@ let names: Vec<&str> = t.lineage(&2).map(|(_, n)| *n).collect(); // ["Jeans", "C
 - Paths, ancestors and subtree walks are iterators: no allocation per step.
 - Removing a node removes its edges (graphs) or its subtree (trees); freed slots are reused.
 - Equality compares content, never storage layout.
+
+`Forest` is for trees walked every frame, such as a UI's retained tree: generational ids (a removed
+node's id fails safely), intrusive links (`O(1)` insert, move and detach, nothing allocated per node),
+a flat preorder index for passes, and per-node data in columns.
+
+```rust
+use sylva::forest::{Column, Flat, Forest, Visit};
+
+let mut f = Forest::new();
+let root = f.push_root();
+let child = f.push_child(root)?;
+let mut width: Column<f32> = Column::new();
+width.fit(&f);
+*width.get_mut(child) = 120.0;
+
+let mut flat = Flat::new();
+flat.update(&f); // rebuilds only when the structure changed
+flat.walk(|slot| if width.as_slice()[slot as usize] > 0.0 { Visit::Enter } else { Visit::Skip });
+```
 
 ## Log
 
@@ -90,7 +109,7 @@ and Mermaid, DOT and D2 rendering.
 ```sh
 cargo test --all-features
 cargo clippy --all-features --all-targets -- -D warnings
-cargo bench --all-features        # benches/: structures and log
+cargo bench --all-features        # benches/: structures, forest and log
 ```
 
 Status: in use by Alfred and Tend, not published. The op JSON of the knowledge model is a stored-data contract (it is

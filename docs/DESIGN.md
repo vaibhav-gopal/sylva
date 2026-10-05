@@ -30,6 +30,7 @@ src/
   error.rs          Error (Invalid, NotFound, Integrity, Json, Io, Db)
   graph.rs          Graph<N, E, K>
   tree.rs           Tree<T, K>
+  forest.rs         Forest, Flat, Column: a tree for hot paths
   log/              feature `log`
     mod.rs          Header, Batch, order, head, Projection, Meta, Conflict, replay
     history.rs      History<P>: incremental replay with snapshots
@@ -43,14 +44,14 @@ src/
     attrs.rs        AttrDef, AttrType, check_value
     trees.rs        catalog Tree, TreeOp, Trees
     graphs/         property Graph, GraphOp, Graphs; query, change, render
-benches/            structures, log (divan)
+benches/            structures, forest, log (divan)
 ```
 
 ## 3. Structures
 
 ### 3.1 Keys and storage
 
-Both structures keep their items in a `Vec` of slots (with a free list) and find them through a
+Graph and Tree keep their items in a `Vec` of slots (with a free list) and find them through a
 `BTreeMap<K, u32>` from key to slot. So:
 - iteration follows the key order, never the order of insertion or the slot layout (determinism);
 - lookups by key are `O(log n)`, and everything inside a walk uses slot numbers (`O(1)`);
@@ -68,7 +69,7 @@ replacing a full scan with the adjacency list changes no result.
 |---|---|
 | `node`, `edge`, `add_node`, `add_edge` | `O(log n)` plus insertion into two sorted lists |
 | `out_edges`, `in_edges`, `degree`, "edge from a to b?" | `O(degree)` |
-| `walk` (breadth first, depth-limited, edge filter) | `O(nodes reached + their edges)` |
+| `walk` (breadth first, depth-limited, edge filter) | `O(nodes reached + their edges)`; past 32 nodes reached, also a bit per slot |
 | `shortest_path` | breadth first, as above |
 | `remove_node` | its edges, plus their entries at the other end |
 | `topological_order` | Kahn's algorithm, ties broken by key; `Err` lists the nodes on or behind a cycle |
@@ -84,6 +85,25 @@ to its slot, so listing children reads no other slot). `entry` and `root_entries
 `subtree` and `preorder` take a predicate that prunes a node with its subtree.
 `move_to` refuses cycles, keeps the tree unchanged on any error, and returns `false` when the node
 is already where it was asked to go, so callers can report "doesn't change anything".
+
+### 3.4 Forest
+
+A tree for hot paths, such as a UI's retained tree walked every frame, beside `Tree` (which stays the
+keyed tree the knowledge model needs). It trades keys for speed:
+- **Ids are `(slot, generation)`.** A slot's generation is even while a node lives there and odd while
+  it's free, so removing a node makes every id for it fail safely, and freed slots are reused.
+- **Intrusive links** (parent, first and last child, previous and next sibling: one 20-byte record per
+  node) make push, insert before or after, move and detach `O(1)` and remove `O(subtree)`, with nothing
+  allocated per node or per child. `move_to` has `Tree`'s contract: cycles refused, nothing changed on
+  an error, `false` when already in place.
+- **`Flat`** is a contiguous preorder index (every slot in preorder, where each subtree ends, and the
+  child lists packed together), rebuilt in `O(n)` without allocating only when `Forest::version`
+  moved. Full passes read its slot array; skipping walks read its child lists with a reused stack.
+- **`Column<T>`** holds per-node data by slot, structure-of-arrays; the forest owns only structure.
+
+Walks follow tree order. Only column sweeps read in slot order, and nothing that has to replay the
+same everywhere depends on how slots were reused. `to_tree` exports it as a `Tree` for snapshots and
+the log.
 
 ## 4. The log layer
 
@@ -180,6 +200,13 @@ The bar is Alfred's baseline (`alfred/docs/benchmarks/baseline.md`). The structu
 
 Generic code costs nothing at run time (it is compiled per use), so generality shows up only in the API.
 
+The forest's bar is a hand-written arena with a child `Vec` per node (`benches/forest.rs`, 16 children
+per node). Medians at 10k / 100k nodes: a full preorder over `Flat` 0.65 / 6.3 µs against 8.9 / 101 µs;
+a dirty walk with 1% dirty 1.45 / 16 µs against 1.7 / 21 µs; removing a subtree 10 / 84 µs against
+13 / 106 µs. Two gaps remain: building 100k nodes takes 1.12-1.16 ms against 1.02-1.13 ms across
+runs (3-10% slower; at 10k it's level), and moving a child to the front takes 12 ns against the arena's
+4 ns (both constant here; the forest checks ids and cycles first). `Tree` builds about ten times slower than either.
+
 ## 7. Testing
 
 Every module has unit tests next to it. The knowledge model's tests are the ones its predecessors had, so
@@ -197,6 +224,9 @@ behaviour is pinned. Also pinned: the chain's hash encoding, and the written-out
 | Conflicts as data, not errors | Merged histories must always replay; people resolve what doesn't apply |
 | The caller picks the signature domain | One key can't be tricked into signing for another purpose |
 | Encryption keys derived per application | One master key can serve several apps without any two sharing a data key |
+| A second tree (`Forest`) beside `Tree` | A tree walked every frame needs generational ids, links and columns; a keyed, ordered tree for catalogs needs the opposite |
+| A walk tracks 32 reached slots in place, then a bit per slot | A flag per slot made one step from a node cost the whole graph |
+| Catalog-tree split and merge apply to a copy | They are several steps that can each fail, and replay keeps whatever state an op leaves |
 
 ## 9. Next
 

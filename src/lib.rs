@@ -3,6 +3,9 @@
 //! - [`graph::Graph`] and [`tree::Tree`] are general-purpose structures with
 //!   stable keys, dense storage and indexes, iterating in key order so every
 //!   replay of the same changes gives the same result.
+//! - [`forest::Forest`] is a tree for hot paths, such as a UI's retained tree
+//!   walked every frame: generational ids, intrusive links, a flat preorder
+//!   index and per-node data in columns.
 //! - [`log`] (feature `log`) is the layer that makes state remember: changes
 //!   are ops in batches, state is the replay of the log, batches order
 //!   causally so branches merge, an op that no longer applies is kept as a
@@ -14,6 +17,7 @@
 //!   diagrams.
 
 pub mod error;
+pub mod forest;
 pub mod graph;
 pub mod tree;
 
