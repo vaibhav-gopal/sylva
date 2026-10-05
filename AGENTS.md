@@ -168,4 +168,8 @@ a review the user asked for):
 
 Graphs and trees that remember: general-purpose structures with a versioned op log on top
 
+- Determinism: the same ops give the same state, byte for byte, on every machine; iteration follows key order, never insertion order or slot layout.
+- Pure Rust; SQLite is the one native dependency, optional and bundled, so the crate builds for desktop, server and iOS.
+- No graph database, query language, general collection library or algorithm catalogue: only the walks and queries Sylva's users need.
+
 The full design (every area's intent, rules, decisions and roadmap) is in Tend: `tend design` (or `tend design render` for all of it as Markdown), and Tend's MCP server (`tend`), which says where a change belongs and which rules apply before you make it.
