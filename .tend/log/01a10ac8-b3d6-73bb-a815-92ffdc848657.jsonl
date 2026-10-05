@@ -1,0 +1,2 @@
+{"batch":"01a10ac8-b3d6-73bb-a815-92ffdc848657","after":"01a10ac8-b226-7138-a214-0c9f03d7f405","author":"agent:claude-code","at":1791182287830,"message":"Forest::to_tree exports to Tree, so Forest uses Tree. (proposal 01a10ac4-5294-73bc-ab8d-4b78bc2cc7da, proposed by agent:claude-code, accepted by user)"}
+{"op":"node.relate","from":"01a10a5e-f376-715b-802a-c91d4c72e4e8","kind":"uses","to":"01a10a54-fb7a-755d-acab-9922f8ebcfae"}
