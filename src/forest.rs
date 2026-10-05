@@ -52,7 +52,8 @@ const NONE: u32 = u32::MAX;
 /// A node's id: its slot and the slot's generation when the node was made.
 ///
 /// A slot's generation is even while a node lives in it and odd while it's free, so an id (always
-/// even) never matches a free slot. It wraps after 2^31 reuses of one slot.
+/// even) never matches a free slot. It wraps after 2^31 reuses of one slot: only then could a
+/// stale id match again.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Id {
     index: u32,
@@ -490,6 +491,19 @@ impl Forest {
         }
     }
 
+    /// Marks `id` and its ancestors in `marks`, stopping at the first one already marked: how a
+    /// pass records "something changed at or below here", so a dirty walk can skip the rest.
+    /// O(depth) for the first mark on a path, O(1) amortized over a pass. `marks` must cover
+    /// every slot ([`Column::fit`]).
+    pub fn mark_with_ancestors(&self, id: Id, marks: &mut Column<bool>) -> Result<()> {
+        let mut i = self.check(id)?;
+        while i != NONE && !marks.values[i as usize] {
+            marks.values[i as usize] = true;
+            i = self.links[i as usize].parent;
+        }
+        Ok(())
+    }
+
     /// The forest as a [`Tree`](crate::tree::Tree), keyed and filled by the closures: for
     /// snapshots, persistence through the log, and debugging views.
     pub fn to_tree<T, K: crate::Key>(
@@ -904,6 +918,21 @@ mod tests {
         assert_eq!(*widths.get(b), 3.0);
         assert_eq!(*widths.get(a), 0.0);
         assert_eq!(widths.as_slice().len(), f.slots());
+    }
+
+    #[test]
+    fn marks_spread_to_ancestors_once() {
+        let (mut f, [a, b, c, d, e, r]) = sample();
+        let mut dirty = Column::<bool>::new();
+        dirty.fit(&f);
+        f.mark_with_ancestors(d, &mut dirty).unwrap();
+        let marked = |dirty: &Column<bool>| [a, b, c, d, e, r].map(|id| *dirty.get(id));
+        assert_eq!(marked(&dirty), [true, true, false, true, false, false]);
+        // b is marked already, so e's mark stops there.
+        f.mark_with_ancestors(e, &mut dirty).unwrap();
+        assert_eq!(marked(&dirty), [true, true, false, true, true, false]);
+        f.remove(c, |_| {}).unwrap();
+        assert!(f.mark_with_ancestors(c, &mut dirty).is_err(), "a stale id");
     }
 
     #[test]
