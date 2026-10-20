@@ -262,6 +262,34 @@ fn reorder_children_forest(bencher: Bencher, n: usize) {
     });
 }
 
+/// Child-list lengths for the reorder benchmarks below: the arena's move shifts the whole list, the
+/// forest's relinks two neighbours whatever its length.
+const WIDTHS: [usize; 3] = [16, 256, 4096];
+
+#[divan::bench(args = WIDTHS)]
+fn reorder_wide_forest(bencher: Bencher, width: usize) {
+    let mut f = Forest::with_capacity(width + 1);
+    let root = f.push_root();
+    for _ in 0..width {
+        f.push_child(root).unwrap();
+    }
+    bencher.bench_local(|| {
+        let first = f.first_child(root);
+        let last = f.last_child(root).unwrap();
+        black_box(f.move_to(last, Some(root), first).unwrap())
+    });
+}
+
+#[divan::bench(args = WIDTHS)]
+fn reorder_wide_arena(bencher: Bencher, width: usize) {
+    let mut list: Vec<u32> = (1..=width as u32).collect();
+    bencher.bench_local(|| {
+        let last = list.pop().unwrap();
+        list.insert(0, last);
+        black_box(list.len())
+    });
+}
+
 #[divan::bench(args = SIZES)]
 fn reorder_children_arena(bencher: Bencher, n: usize) {
     let mut a = build_arena(n);

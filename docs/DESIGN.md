@@ -165,8 +165,9 @@ lives) is the application's job.
 ### 5.1 Property graphs
 
 Nodes and edges have a string type and JSON props. Every prop, node and edge records its source: stated
-(by a person or an agent) or observed (by a named scanner). An observation never overwrites or removes
-what was stated, and a scanner can re-run any number of times. Schemas (optional, possibly `open`) list
+(by a person or an agent) or observed (by a named scanner). An observation never overwrites a stated
+fact or removes a stated node or edge, and a scanner can re-run any number of times; when a scanner
+removes a node or edge it observed, the props stated on it go too (the log keeps them). Schemas (optional, possibly `open`) list
 node types with typed props, and edge types with the node types they may connect and, optionally, the
 edge's name read backwards (`runs_on` ↔ `hosts`; `Schema::edge_name`), since an edge is stored once. A
 node may stand for an entity owned elsewhere (`ref`: `domain/kind/id`, `files:path`, or a host's own
@@ -205,9 +206,16 @@ Generic code costs nothing at run time (it is compiled per use), so generality s
 The forest's bar is a hand-written arena with a child `Vec` per node (`benches/forest.rs`, 16 children
 per node). Medians at 10k / 100k nodes: a full preorder over `Flat` 0.65 / 6.3 µs against 8.9 / 101 µs;
 a dirty walk with 1% dirty 1.45 / 16 µs against 1.7 / 21 µs; removing a subtree 10 / 84 µs against
-13 / 106 µs. Two gaps remain: building 100k nodes takes 1.12-1.16 ms against 1.02-1.13 ms across
-runs (3-10% slower; at 10k it's level), and moving a child to the front takes 12 ns against the arena's
-4 ns (both constant here; the forest checks ids and cycles first). `Tree` builds about ten times slower than either.
+13 / 106 µs; building 69 µs / 0.98 ms against 68 µs / 1.1 ms. (The forest's small accessors are
+`#[inline]`, so callers in other crates don't pay a call per step; that alone halved its build with
+warm memory and cut link walks by a fifth.) Reordering children trades the other way: the forest
+relinks two neighbours in about 9 ns whatever the list's length, where the arena shifts the list
+(4.4 ns at 16 children, 14 ns at 256, 204 ns at 4096), so the arena is ahead only on short lists,
+by the forest's id and cycle checks. `Tree` builds about ten times slower than either.
+
+Run each benchmark alone when comparing: the forest allocates its slots up front, so a run right
+after another benchmark that freed memory builds up to twice as fast as one that has to fault in
+fresh pages.
 
 ## 7. Testing
 
@@ -231,6 +239,8 @@ behaviour is pinned. Also pinned: the chain's hash encoding, and the written-out
 | A second tree (`Forest`) beside `Tree` | A tree walked every frame needs generational ids, links and columns; a keyed, ordered tree for catalogs needs the opposite |
 | A walk tracks 32 reached slots in place, then a bit per slot | A flag per slot made one step from a node cost the whole graph |
 | Catalog-tree split and merge apply to a copy | They are several steps that can each fail, and replay keeps whatever state an op leaves |
+| `Error` is `#[non_exhaustive]` | Features add variants, and features unify across a build, so a match elsewhere needs a catch-all |
+| The forest's small accessors are `#[inline]` | A call per step across crates halved its build speed; the forest exists to be fast in someone else's loop |
 
 ## 9. Next
 

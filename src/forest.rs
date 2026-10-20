@@ -64,6 +64,7 @@ pub struct Id {
 
 impl Id {
     /// The dense slot this id refers to (the index into [`Column`]s).
+    #[inline]
     pub fn slot(self) -> usize {
         self.index as usize
     }
@@ -73,6 +74,13 @@ impl core::fmt::Display for Id {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}v{}", self.index, self.generation)
     }
+}
+
+/// Why [`Forest::move_to`] refuses a move.
+enum Refused {
+    BeforeItself,
+    NotAChild(u32),
+    IntoSubtree,
 }
 
 /// What a walk does at a node.
@@ -146,30 +154,36 @@ impl Forest {
     }
 
     /// How many nodes are alive.
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Whether the forest has no nodes.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// The number of slots, alive or free: the length columns must have.
+    #[inline]
     pub fn slots(&self) -> usize {
         self.links.len()
     }
 
     /// Changes whenever the structure changes (a node added, moved or removed).
+    #[inline]
     pub fn version(&self) -> u64 {
         self.version
     }
 
     /// Whether `id` refers to a live node (not removed, not a reused slot).
+    #[inline]
     pub fn contains(&self, id: Id) -> bool {
         self.generation.get(id.index as usize) == Some(&id.generation)
     }
 
+    #[inline]
     fn check(&self, id: Id) -> Result<u32> {
         if self.contains(id) {
             Ok(id.index)
@@ -178,6 +192,7 @@ impl Forest {
         }
     }
 
+    #[inline]
     fn id(&self, index: u32) -> Option<Id> {
         (index != NONE).then(|| Id {
             index,
@@ -186,6 +201,7 @@ impl Forest {
     }
 
     /// The id of the live node in `slot` (for walks over [`Flat`], which yield slots).
+    #[inline]
     pub fn id_at(&self, slot: usize) -> Option<Id> {
         let generation = *self.generation.get(slot)?;
         (generation % 2 == 0).then_some(Id {
@@ -194,6 +210,7 @@ impl Forest {
         })
     }
 
+    #[inline]
     fn allocate(&mut self) -> u32 {
         self.len += 1;
         self.version += 1;
@@ -210,6 +227,7 @@ impl Forest {
     }
 
     /// Links `i` (unlinked) under `parent` (`NONE`: the root list), before `before` (`NONE`: last).
+    #[inline]
     fn link(&mut self, i: u32, parent: u32, before: u32) {
         let prev = if before == NONE {
             if parent == NONE {
@@ -237,6 +255,7 @@ impl Forest {
     }
 
     /// Takes `i` out of its sibling list; its subtree stays attached to it.
+    #[inline]
     fn unlink(&mut self, i: u32) {
         let s = i as usize;
         let Links {
@@ -258,6 +277,7 @@ impl Forest {
     }
 
     /// Adds a root, after the existing roots.
+    #[inline]
     pub fn push_root(&mut self) -> Id {
         let i = self.allocate();
         self.link(i, NONE, NONE);
@@ -265,6 +285,7 @@ impl Forest {
     }
 
     /// Adds a node as `parent`'s last child.
+    #[inline]
     pub fn push_child(&mut self, parent: Id) -> Result<Id> {
         let p = self.check(parent)?;
         let i = self.allocate();
@@ -273,6 +294,7 @@ impl Forest {
     }
 
     /// Adds a node just before `sibling`, under the same parent (or among the roots).
+    #[inline]
     pub fn insert_before(&mut self, sibling: Id) -> Result<Id> {
         let s = self.check(sibling)?;
         let parent = self.links[s as usize].parent;
@@ -282,6 +304,7 @@ impl Forest {
     }
 
     /// Adds a node just after `sibling`, under the same parent (or among the roots).
+    #[inline]
     pub fn insert_after(&mut self, sibling: Id) -> Result<Id> {
         let s = self.check(sibling)?;
         let Links { parent, next, .. } = self.links[s as usize];
@@ -293,34 +316,50 @@ impl Forest {
     /// Moves `id` (with its subtree) under `parent` (`None`: among the roots), before `before`
     /// (`None`: last). Fails, changing nothing, if `parent` is `id` or lies inside its subtree, or
     /// if `before` isn't a child of `parent`; returns `false` when `id` is already there.
+    #[inline]
     pub fn move_to(&mut self, id: Id, parent: Option<Id>, before: Option<Id>) -> Result<bool> {
         let i = self.check(id)?;
         let p = parent.map_or(Ok(NONE), |p| self.check(p))?;
         let b = before.map_or(Ok(NONE), |b| self.check(b))?;
         if b == i {
-            return invalid(format!("can't move {id} before itself"));
+            return self.refuse(id, Refused::BeforeItself);
         }
         if b != NONE && self.links[b as usize].parent != p {
-            return invalid(format!(
-                "{} isn't a child of the new parent",
-                self.id(b).expect("checked")
-            ));
-        }
-        let mut a = p;
-        while a != NONE {
-            if a == i {
-                return invalid(format!("can't move {id} into its own subtree"));
-            }
-            a = self.links[a as usize].parent;
+            return self.refuse(id, Refused::NotAChild(b));
         }
         let here = self.links[i as usize];
-        if here.parent == p && here.next == b {
-            return Ok(false);
+        if here.parent == p {
+            // Among its own siblings (a reorder): `p` is its parent, so it can't be inside `id`.
+            if here.next == b {
+                return Ok(false);
+            }
+        } else {
+            let mut a = p;
+            while a != NONE {
+                if a == i {
+                    return self.refuse(id, Refused::IntoSubtree);
+                }
+                a = self.links[a as usize].parent;
+            }
         }
         self.unlink(i);
         self.link(i, p, b);
         self.version += 1;
         Ok(true)
+    }
+
+    /// Why a move is refused. The message is built out of line, so `move_to` stays small.
+    #[cold]
+    #[inline(never)]
+    fn refuse(&self, id: Id, why: Refused) -> Result<bool> {
+        match why {
+            Refused::BeforeItself => invalid(format!("can't move {id} before itself")),
+            Refused::NotAChild(b) => invalid(format!(
+                "{} isn't a child of the new parent",
+                self.id(b).expect("checked")
+            )),
+            Refused::IntoSubtree => invalid(format!("can't move {id} into its own subtree")),
+        }
     }
 
     /// Removes `id` and its whole subtree, calling `removed` for each node (children before their
@@ -350,6 +389,7 @@ impl Forest {
         Ok(count)
     }
 
+    #[inline]
     fn free_slot(&mut self, i: u32) {
         let s = i as usize;
         self.generation[s] = self.generation[s].wrapping_add(1);
@@ -359,6 +399,7 @@ impl Forest {
     }
 
     /// The deepest first descendant of `i` (`i` itself if it has no children).
+    #[inline]
     fn deepest_first(&self, mut i: u32) -> u32 {
         while self.links[i as usize].first != NONE {
             i = self.links[i as usize].first;
@@ -367,6 +408,7 @@ impl Forest {
     }
 
     /// `id`'s parent (`None` for a root or a dead id).
+    #[inline]
     pub fn parent(&self, id: Id) -> Option<Id> {
         self.check(id)
             .ok()
@@ -374,6 +416,7 @@ impl Forest {
     }
 
     /// `id`'s first child.
+    #[inline]
     pub fn first_child(&self, id: Id) -> Option<Id> {
         self.check(id)
             .ok()
@@ -381,6 +424,7 @@ impl Forest {
     }
 
     /// `id`'s last child.
+    #[inline]
     pub fn last_child(&self, id: Id) -> Option<Id> {
         self.check(id)
             .ok()
@@ -388,6 +432,7 @@ impl Forest {
     }
 
     /// The sibling after `id`.
+    #[inline]
     pub fn next_sibling(&self, id: Id) -> Option<Id> {
         self.check(id)
             .ok()
@@ -395,6 +440,7 @@ impl Forest {
     }
 
     /// The sibling before `id`.
+    #[inline]
     pub fn prev_sibling(&self, id: Id) -> Option<Id> {
         self.check(id)
             .ok()
@@ -402,6 +448,7 @@ impl Forest {
     }
 
     /// The roots, in order.
+    #[inline]
     pub fn roots(&self) -> Siblings<'_> {
         Siblings {
             forest: self,
@@ -410,6 +457,7 @@ impl Forest {
     }
 
     /// `id`'s children, in order (none for a dead id).
+    #[inline]
     pub fn children(&self, id: Id) -> Siblings<'_> {
         let next = self
             .check(id)
@@ -418,6 +466,7 @@ impl Forest {
     }
 
     /// `id`'s ancestors, nearest first (not `id` itself).
+    #[inline]
     pub fn ancestors(&self, id: Id) -> Ancestors<'_> {
         let next = self
             .check(id)
@@ -427,6 +476,7 @@ impl Forest {
 
     /// `root` and its descendants, parents before children, siblings in order, by following
     /// links. Allocates nothing; for whole passes, [`Flat`] is faster.
+    #[inline]
     pub fn preorder(&self, root: Id) -> Preorder<'_> {
         let r = self.check(root).unwrap_or(NONE);
         Preorder {
@@ -437,6 +487,7 @@ impl Forest {
     }
 
     /// `root` and its descendants, children before parents. Allocates nothing.
+    #[inline]
     pub fn postorder(&self, root: Id) -> Postorder<'_> {
         let r = self.check(root).unwrap_or(NONE);
         let next = if r == NONE {
@@ -452,6 +503,7 @@ impl Forest {
     }
 
     /// The slot that follows `i` in preorder within `root`'s subtree (`NONE` at its end).
+    #[inline]
     fn preorder_next(&self, i: u32, root: u32) -> u32 {
         let first = self.links[i as usize].first;
         if first != NONE {
@@ -461,6 +513,7 @@ impl Forest {
     }
 
     /// The slot that follows `i`'s subtree in preorder within `root`'s (`NONE` at its end).
+    #[inline]
     fn after_subtree(&self, i: u32, root: u32) -> u32 {
         let mut j = i;
         loop {
@@ -617,11 +670,13 @@ impl Flat {
     }
 
     /// Every live slot, in preorder.
+    #[inline]
     pub fn slots(&self) -> &[u32] {
         &self.slots
     }
 
     /// For each position in [`Flat::slots`], the position just past its subtree.
+    #[inline]
     pub fn ends(&self) -> &[u32] {
         &self.ends
     }
@@ -642,6 +697,7 @@ impl Flat {
     }
 
     /// The children of `slot`, in order, from the contiguous lists.
+    #[inline]
     pub fn children_of(&self, slot: u32) -> &[u32] {
         let [start, end] = self.child_range[slot as usize];
         &self.children[start as usize..end as usize]
@@ -656,6 +712,7 @@ pub struct Siblings<'f> {
 
 impl Iterator for Siblings<'_> {
     type Item = Id;
+    #[inline]
     fn next(&mut self) -> Option<Id> {
         let i = self.next;
         if i == NONE {
@@ -674,6 +731,7 @@ pub struct Ancestors<'f> {
 
 impl Iterator for Ancestors<'_> {
     type Item = Id;
+    #[inline]
     fn next(&mut self) -> Option<Id> {
         let i = self.next;
         if i == NONE {
@@ -693,6 +751,7 @@ pub struct Preorder<'f> {
 
 impl Iterator for Preorder<'_> {
     type Item = Id;
+    #[inline]
     fn next(&mut self) -> Option<Id> {
         let i = self.next;
         if i == NONE {
@@ -712,6 +771,7 @@ pub struct Postorder<'f> {
 
 impl Iterator for Postorder<'_> {
     type Item = Id;
+    #[inline]
     fn next(&mut self) -> Option<Id> {
         let i = self.next;
         if i == NONE {
