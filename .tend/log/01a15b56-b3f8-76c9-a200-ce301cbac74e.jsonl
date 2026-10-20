@@ -1,0 +1,4 @@
+{"batch":"01a15b56-b3f8-76c9-a200-ce301cbac74e","after":"01a15b1b-25f1-7601-9695-dc94558afba6","author":"agent:claude-code","at":1792533771256,"message":"The user ran `tend baseline render --write` for releases 2026.10.1-2026.10.3: AGENTS.md, CONTACT.md and three skills rendered again, and Tend's hooks taken out of the committed .claude/settings.json (they run from the user-level settings on each machine). tend check holds with 0 errors. (proposal 01a15b54-739a-73d7-894e-424f3513b3cd, proposed by agent:claude-code, accepted by user)"}
+{"op":"todo.status","id":"01a10dfc-567d-733c-977a-2b1cdc79154b","status":"done","reason":null}
+{"op":"todo.status","id":"01a122bf-edd2-724c-8134-8189c36d10bb","status":"done","reason":null}
+{"op":"todo.status","id":"01a14715-54fb-7300-a5b4-37cd934f9bda","status":"done","reason":null}
