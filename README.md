@@ -15,8 +15,16 @@ Extra features: `sign` (Ed25519 signatures over batches), `sqlite` (the hash cha
 `std` is on by default; without it (`default-features = false`) the structures need only `alloc` and
 build for no_std and wasm targets, with `thiserror` as their one dependency.
 
-It was extracted from [Alfred](../alfred); Alfred and [Tend](../tend) build on it. The design is in
+It was extracted from Alfred, a personal assistant; Alfred and Tend (design histories kept in a repo)
+build on it, and parda-2d's retained UI tree is a `Forest`. The design is in
 [docs/DESIGN.md](docs/DESIGN.md).
+
+```toml
+[dependencies]  # one of:
+sylva = "0.1"                                                   # graphs, trees, the forest
+sylva = { version = "0.1", features = ["log", "knowledge"] }    # with the op log and the knowledge model
+sylva = { version = "0.1", default-features = false }           # no_std + alloc, e.g. wasm32
+```
 
 ## Structures
 
@@ -115,5 +123,8 @@ cargo bench --all-features        # benches/: structures, forest and log
 cargo build --no-default-features --target wasm32-unknown-unknown   # the structures without std
 ```
 
-Status: in use by Alfred and Tend, not published. The op JSON of the knowledge model is a stored-data contract (it is
+Status: in use by Alfred, Tend and parda-2d. The op JSON of the knowledge model is a stored-data contract (it is
 in Alfred's log and in every repo's `.tend/log`), so it only changes with a migration.
+
+Licensed under GPL-3.0-only with the Open Project Exception, or a royalty-free or commercial license:
+see [LICENSE.md](LICENSE.md), and [CONTACT.md](CONTACT.md) for the latter two.

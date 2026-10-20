@@ -4,6 +4,27 @@ version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-only OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0"
 description = "Graphs and trees that remember: general-purpose structures with a versioned op log on top"
+repository = "https://github.com/vaibhav-gopal/sylva"
+readme = "README.md"
+keywords = ["graph", "tree", "event-sourcing", "op-log", "forest"]
+categories = ["data-structures", "no-std", "wasm"]
+# What the published crate holds: the code, its benchmarks, and the documents a user needs. The rest
+# (Tend's design history, agent and CI files) stays in the repository.
+include = [
+    "src/**/*.rs",
+    "benches/**/*.rs",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE.md",
+    "LICENSES/**",
+    "REUSE.toml",
+    "SECURITY.md",
+    "CONTACT.md",
+    "docs/DESIGN.md",
+]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 default = ["std"]
