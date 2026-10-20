@@ -1,0 +1,5 @@
+{"batch":"01a10e58-937b-7538-9676-b91b5ba945cf","after":"01a10e57-3525-731c-83bf-9374a35bc2cf","author":"agent:claude-code","at":1791242048379,"message":"The Error #[non_exhaustive] todo waits on tend and alfred adding a catch-all arm (grafts 01a10e58-442a and 01a10e58-4445). (proposal 01a10e58-64fd-7402-ab29-170bf18ed6b8, proposed by agent:claude-code, accepted by user)"}
+{"op":"plan.wait","item":"01a10e56-4708-75c3-9da3-fd4a91bed3ed","wait":{"on":"graft:01a10e58-442a"},"remove":false}
+{"op":"plan.wait","item":"01a10e56-4708-75c3-9da3-fd4a91bed3ed","wait":{"on":"graft:01a10e58-4445"},"remove":false}
+{"op":"todo.status","id":"01a10e56-4708-75c3-9da3-fd49be251e08","status":"done","reason":null}
+{"op":"node.check.set","node":"01a10a4b-cdce-72a2-82d1-d5122b03d702","check":{"kind":"gate","name":"ci on GitHub","run":"gh run list --workflow ci --limit 1","of":"unit tests","condition":"pass","level":"warn","notes":".github/workflows/ci.yml: clippy and tests under all, default and no default features, and the wasm32 build without std."}}
