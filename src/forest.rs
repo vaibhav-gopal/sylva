@@ -535,7 +535,6 @@ impl Forest {
 pub struct Flat {
     slots: Vec<u32>,
     ends: Vec<u32>,
-    sizes: Vec<u32>,
     /// Every node's children, contiguous and in order (compressed rows): the children of slot
     /// `s` are `children[child_range[s][0]..child_range[s][1]]`, the roots `children[..roots]`.
     children: Vec<u32>,
@@ -543,6 +542,9 @@ pub struct Flat {
     roots: u32,
     /// Reused by [`Flat::walk`].
     stack: Vec<u32>,
+    /// Reused by [`Flat::update`]: per level of the walk, `[position, next child, end]` into the
+    /// child lists.
+    frames: Vec<[u32; 3]>,
     version: Option<u64>,
 }
 
@@ -559,34 +561,8 @@ impl Flat {
             return false;
         }
         self.version = Some(forest.version());
-        self.slots.clear();
-        let mut root = forest.first_root;
-        while root != NONE {
-            let mut i = root;
-            while i != NONE {
-                self.slots.push(i);
-                i = forest.preorder_next(i, root);
-            }
-            root = forest.links[root as usize].next;
-        }
-        // Subtree sizes, children before parents (preorder reversed), then where each ends.
-        self.sizes.clear();
-        self.sizes.resize(forest.slots(), 0);
-        for &s in self.slots.iter().rev() {
-            self.sizes[s as usize] += 1;
-            let p = forest.links[s as usize].parent;
-            if p != NONE {
-                self.sizes[p as usize] += self.sizes[s as usize];
-            }
-        }
-        self.ends.clear();
-        self.ends.extend(
-            self.slots
-                .iter()
-                .enumerate()
-                .map(|(k, &s)| k as u32 + self.sizes[s as usize]),
-        );
-        // Children lists, contiguous: what a skipping walk reads (siblings share cache lines).
+        // The child lists first, in one pass over the slots: each sibling chain is followed once,
+        // and the roots come first. (A free slot has no first child.)
         self.children.clear();
         let mut root = forest.first_root;
         while root != NONE {
@@ -595,16 +571,48 @@ impl Flat {
         }
         self.roots = self.children.len() as u32;
         self.child_range.clear();
-        self.child_range.resize(forest.slots(), [0, 0]);
-        for &s in &self.slots {
+        self.child_range.reserve(forest.slots());
+        for links in &forest.links {
             let start = self.children.len() as u32;
-            let mut c = forest.links[s as usize].first;
+            let mut c = links.first;
             while c != NONE {
                 self.children.push(c);
                 c = forest.links[c as usize].next;
             }
-            self.child_range[s as usize] = [start, self.children.len() as u32];
+            self.child_range.push([start, self.children.len() as u32]);
         }
+        // Then preorder and where each subtree ends, by walking the contiguous child lists instead
+        // of the links: a frame per level holds its position and the children left to visit.
+        self.slots.clear();
+        self.ends.clear();
+        self.ends.resize(forest.len(), 0);
+        let mut frames = core::mem::take(&mut self.frames);
+        frames.clear();
+        for r in 0..self.roots as usize {
+            let root = self.children[r];
+            let [first, end] = self.child_range[root as usize];
+            frames.push([self.slots.len() as u32, first, end]);
+            self.slots.push(root);
+            while let Some(top) = frames.last_mut() {
+                if top[1] < top[2] {
+                    let c = self.children[top[1] as usize];
+                    top[1] += 1;
+                    let [first, end] = self.child_range[c as usize];
+                    let at = self.slots.len() as u32;
+                    self.slots.push(c);
+                    if first == end {
+                        // A leaf (most nodes): it ends where it starts, with no frame.
+                        self.ends[at as usize] = at + 1;
+                    } else {
+                        frames.push([at, first, end]);
+                    }
+                } else {
+                    self.ends[top[0] as usize] = self.slots.len() as u32;
+                    frames.pop();
+                }
+            }
+        }
+        self.frames = frames;
         true
     }
 
@@ -836,6 +844,47 @@ mod tests {
         assert!(flat.update(&f), "a move changes the structure");
         let slots: Vec<usize> = flat.slots().iter().map(|&s| s as usize).collect();
         assert_eq!(slots, [a, b, c, d, e, r].map(Id::slot));
+    }
+
+    #[test]
+    fn flat_agrees_with_the_links_after_removals_and_reuse() {
+        // Three levels, then churn: remove subtrees, reuse their slots elsewhere, move nodes.
+        let mut f = Forest::new();
+        let mut ids = Vec::new();
+        for _ in 0..3 {
+            let r = f.push_root();
+            ids.push(r);
+            for _ in 0..4 {
+                let c = f.push_child(r).unwrap();
+                ids.push(c);
+                for _ in 0..3 {
+                    ids.push(f.push_child(c).unwrap());
+                }
+            }
+        }
+        f.remove(ids[1], |_| {}).unwrap();
+        // The second root's second child (each root's block is 17 ids: itself, then 4 x (child + 3)).
+        f.remove(ids[17 + 5], |_| {}).unwrap();
+        let r = f.roots().nth(1).unwrap();
+        let fresh: Vec<Id> = (0..6).map(|_| f.push_child(r).unwrap()).collect();
+        f.move_to(fresh[0], Some(fresh[1]), None).unwrap();
+        f.move_to(f.roots().next().unwrap(), None, None).unwrap();
+
+        let mut flat = Flat::new();
+        flat.update(&f);
+        let by_links: Vec<u32> = f
+            .roots()
+            .flat_map(|root| f.preorder(root))
+            .map(|id| id.slot() as u32)
+            .collect();
+        assert_eq!(flat.slots(), by_links, "preorder, roots in order");
+        for (k, &s) in flat.slots().iter().enumerate() {
+            let id = f.id_at(s as usize).unwrap();
+            let size = f.preorder(id).count() as u32;
+            assert_eq!(flat.ends()[k], k as u32 + size, "where {id}'s subtree ends");
+            let kids: Vec<u32> = f.children(id).map(|c| c.slot() as u32).collect();
+            assert_eq!(flat.children_of(s), kids, "{id}'s children, in order");
+        }
     }
 
     #[test]
