@@ -5,7 +5,11 @@
 
 use alloc::string::String;
 
+/// Non-exhaustive: features add variants (`Json` with `log` or `knowledge`, `Io` with `std`, `Db`
+/// with `sqlite`), and features unify across a build, so a match outside this crate needs a
+/// catch-all arm.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The change doesn't apply (it would break a rule, or changes nothing).
     #[error("invalid operation: {0}")]
