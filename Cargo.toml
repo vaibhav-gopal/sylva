@@ -30,9 +30,9 @@ all-features = true
 default = ["std"]
 # The standard library. Without it the structures (graph, tree, forest) need only `alloc`, for
 # no_std and wasm targets; the log and the knowledge model need it.
-std = ["thiserror/std"]
-# Serialization for the log and the knowledge model.
-serde = ["std", "dep:serde", "uuid?/serde"]
+std = ["thiserror/std", "serde?/std"]
+# Serialization: Graph and Tree (no_std too, with alloc), and what the log and the knowledge model write.
+serde = ["dep:serde", "uuid?/serde"]
 # Batches, causal order, replay, history with snapshots, batch files and the hash chain.
 log = ["std", "dep:uuid", "serde", "dep:serde_json", "dep:sha2", "dep:hex"]
 # Ed25519 signatures over batches (domain-separated).
@@ -49,7 +49,7 @@ ts = ["knowledge", "dep:ts-rs"]
 [dependencies]
 uuid = { version = "1", features = ["v7"], optional = true }
 thiserror = { version = "2", default-features = false }
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"], optional = true }
 serde_json = { version = "1", optional = true }
 sha2 = { version = "0.10", optional = true }
 hex = { version = "0.4", optional = true }
@@ -62,6 +62,7 @@ ts-rs = { version = "12.0.1", features = ["serde-compat", "uuid-impl", "serde-js
 
 [dev-dependencies]
 divan = "0.1.21"
+serde_json = "1"
 tempfile = "3"
 
 [[bench]]

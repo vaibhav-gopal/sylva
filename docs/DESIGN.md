@@ -46,6 +46,7 @@ src/
     trees.rs        catalog Tree, TreeOp, Trees
     graphs/         property Graph, GraphOp, Graphs; query, change, render
 benches/            structures, forest, log (divan)
+tests/serde.rs      Graph and Tree written out and read back (feature `serde`)
 ```
 
 ## 3. Structures
@@ -60,6 +61,13 @@ Graph and Tree keep their items in a `Vec` of slots (with a free list) and find 
 
 `K` is any `Copy + Ord + Hash + Debug + Display` type, and the caller always names it (there is no
 default); Alfred, Tend and the knowledge model use UUIDv7.
+
+With the `serde` feature (no_std too) both write out as their content, never their slots, so equal
+structures write the same bytes: a `Graph` as `{"nodes": [{key, data}], "edges": [{key, from, to,
+data}]}` in key order, a `Tree` as `{"nodes": [{key, parent, data}]}` in preorder (parents first,
+siblings in order). Reading back goes through `add_node`, `add_edge` and `insert`, so a duplicate key,
+a missing parent or an edge to a missing node is an error rather than a broken structure. The
+knowledge model keeps its own written forms (5.3).
 
 ### 3.2 Graph
 
@@ -240,11 +248,16 @@ behaviour is pinned. Also pinned: the chain's hash encoding, and the written-out
 | A walk tracks 32 reached slots in place, then a bit per slot | A flag per slot made one step from a node cost the whole graph |
 | Catalog-tree split and merge apply to a copy | They are several steps that can each fail, and replay keeps whatever state an op leaves |
 | `Error` is `#[non_exhaustive]` | Features add variants, and features unify across a build, so a match elsewhere needs a catch-all |
+| Graph and Tree serialize their content, read back checked | Equal structures must write the same bytes, and a written form must not be able to build a broken one |
 | The forest's small accessors are `#[inline]` | A call per step across crates halved its build speed; the forest exists to be fast in someone else's loop |
 
 ## 9. Next
 
-- Alfred's store onto `crypt` (the format already matches), dropping its own copy of the cipher.
-- Serde for the generic structures, for users without the knowledge model.
-- Persisted snapshots for long histories (today snapshots live in memory).
-- A reverse-relation index pattern for projections that ask "what points at this?" often.
+- An incremental `Flat::update`, patching the changed subtrees instead of rebuilding, once rebuilds
+  show up in a frame budget.
+- Alfred's store onto `crypt` (the format already matches), dropping its own copy of the cipher: Alfred's
+  change to make, asked of it.
+
+Considered and left: persisted snapshots (the longest history is 187 batches, 0.6 MB, and replays
+quickly), and a reverse-relation index pattern (graphs already answer "what points at this" in
+`O(degree)`, and only Alfred keeps an index of its own).

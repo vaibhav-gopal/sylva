@@ -11,8 +11,9 @@ Sylva is a small Rust library with three layers:
 | **Knowledge** | `knowledge` | a typed property graph and a catalog tree built on the two, with schemas, stated vs observed facts, references, queries and diagrams |
 
 Extra features: `sign` (Ed25519 signatures over batches), `sqlite` (the hash chain in SQLite), `crypt`
-(encryption at rest for a stored log), `ts` (TypeScript types for the knowledge model, via ts-rs).
-`std` is on by default; without it (`default-features = false`) the structures need only `alloc` and
+(encryption at rest for a stored log), `ts` (TypeScript types for the knowledge model, via ts-rs),
+`serde` (`Graph` and `Tree` written out as their content in key order and preorder, and read back
+checked; no_std too). `std` is on by default; without it (`default-features = false`) the structures need only `alloc` and
 build for no_std and wasm targets, with `thiserror` as their one dependency.
 
 It was extracted from Alfred, a personal assistant; Alfred and Tend (design histories kept in a repo)
@@ -121,6 +122,7 @@ cargo test --all-features
 cargo clippy --all-features --all-targets -- -D warnings
 cargo bench --all-features        # benches/: structures, forest and log
 cargo build --no-default-features --target wasm32-unknown-unknown   # the structures without std
+cargo test --test serde --features serde                           # Graph and Tree with serde
 ```
 
 Status: in use by Alfred, Tend and parda-2d. The op JSON of the knowledge model is a stored-data contract (it is

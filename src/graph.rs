@@ -563,6 +563,101 @@ impl<N: PartialEq, E: PartialEq, K: Key> PartialEq for Graph<N, E, K> {
     }
 }
 
+/// With the `serde` feature a graph writes out as its content in key order, never its slot layout:
+/// `{"nodes": [{"key", "data"}], "edges": [{"key", "from", "to", "data"}]}`. It reads back through
+/// [`Graph::add_node`] and [`Graph::add_edge`], so a duplicate key or an edge whose end is missing
+/// is an error, not a broken graph.
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::{Graph, Key};
+    use alloc::vec::Vec;
+    use serde::de::{Deserialize, Deserializer, Error as _};
+    use serde::ser::{Serialize, SerializeStruct, Serializer};
+
+    #[derive(serde::Serialize)]
+    struct NodeOut<'a, K, N> {
+        key: K,
+        data: &'a N,
+    }
+
+    #[derive(serde::Serialize)]
+    struct EdgeOut<'a, K, E> {
+        key: K,
+        from: K,
+        to: K,
+        data: &'a E,
+    }
+
+    struct Nodes<'a, N, E, K: Key>(&'a Graph<N, E, K>);
+    struct Edges<'a, N, E, K: Key>(&'a Graph<N, E, K>);
+
+    impl<N: Serialize, E, K: Key + Serialize> Serialize for Nodes<'_, N, E, K> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            s.collect_seq(self.0.nodes().map(|(key, data)| NodeOut { key, data }))
+        }
+    }
+
+    impl<N, E: Serialize, K: Key + Serialize> Serialize for Edges<'_, N, E, K> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            s.collect_seq(self.0.edges().map(|e| EdgeOut {
+                key: e.key,
+                from: e.from,
+                to: e.to,
+                data: e.data,
+            }))
+        }
+    }
+
+    impl<N: Serialize, E: Serialize, K: Key + Serialize> Serialize for Graph<N, E, K> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut out = s.serialize_struct("Graph", 2)?;
+            out.serialize_field("nodes", &Nodes(self))?;
+            out.serialize_field("edges", &Edges(self))?;
+            out.end()
+        }
+    }
+
+    #[derive(serde::Deserialize)]
+    struct NodeIn<K, N> {
+        key: K,
+        data: N,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct EdgeIn<K, E> {
+        key: K,
+        from: K,
+        to: K,
+        data: E,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct GraphIn<K, N, E> {
+        nodes: Vec<NodeIn<K, N>>,
+        edges: Vec<EdgeIn<K, E>>,
+    }
+
+    impl<'de, N, E, K> Deserialize<'de> for Graph<N, E, K>
+    where
+        N: Deserialize<'de>,
+        E: Deserialize<'de>,
+        K: Key + Deserialize<'de>,
+    {
+        fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+            let read = GraphIn::<K, N, E>::deserialize(d)?;
+            let mut g = Graph::new();
+            for n in read.nodes {
+                g.add_node(n.key, n.data).map_err(D::Error::custom)?;
+            }
+            for e in read.edges {
+                g.add_edge(e.key, e.from, e.to, e.data)
+                    .map_err(D::Error::custom)?;
+            }
+            Ok(g)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

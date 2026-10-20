@@ -459,6 +459,74 @@ impl<T: PartialEq, K: Key> PartialEq for Tree<T, K> {
     }
 }
 
+/// With the `serde` feature a tree writes out as its nodes in preorder, roots in order, each with
+/// its parent: `{"nodes": [{"key", "parent", "data"}]}`. Parents come before their children and
+/// siblings in their order, so reading back through [`Tree::insert`] rebuilds the same tree; a
+/// duplicate key or a parent that hasn't appeared yet is an error, not a broken tree.
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::{Key, Tree};
+    use alloc::vec::Vec;
+    use serde::de::{Deserialize, Deserializer, Error as _};
+    use serde::ser::{Serialize, SerializeStruct, Serializer};
+
+    #[derive(serde::Serialize)]
+    struct NodeOut<'a, K, T> {
+        key: K,
+        parent: Option<K>,
+        data: &'a T,
+    }
+
+    struct Nodes<'a, T, K: Key>(&'a Tree<T, K>);
+
+    impl<T: Serialize, K: Key + Serialize> Serialize for Nodes<'_, T, K> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let tree = self.0;
+            s.collect_seq(tree.preorder(|_, _| true).map(|(key, data)| NodeOut {
+                key,
+                parent: tree.parent(&key),
+                data,
+            }))
+        }
+    }
+
+    impl<T: Serialize, K: Key + Serialize> Serialize for Tree<T, K> {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let mut out = s.serialize_struct("Tree", 1)?;
+            out.serialize_field("nodes", &Nodes(self))?;
+            out.end()
+        }
+    }
+
+    #[derive(serde::Deserialize)]
+    struct NodeIn<K, T> {
+        key: K,
+        parent: Option<K>,
+        data: T,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct TreeIn<K, T> {
+        nodes: Vec<NodeIn<K, T>>,
+    }
+
+    impl<'de, T, K> Deserialize<'de> for Tree<T, K>
+    where
+        T: Deserialize<'de>,
+        K: Key + Deserialize<'de>,
+    {
+        fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+            let read = TreeIn::<K, T>::deserialize(d)?;
+            let mut tree = Tree::new();
+            for n in read.nodes {
+                tree.insert(n.key, n.parent, None, n.data)
+                    .map_err(D::Error::custom)?;
+            }
+            Ok(tree)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
