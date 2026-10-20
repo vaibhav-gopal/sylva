@@ -107,8 +107,12 @@ keyed tree the knowledge model needs). It trades keys for speed:
   allocated per node or per child. `move_to` has `Tree`'s contract: cycles refused, nothing changed on
   an error, `false` when already in place.
 - **`Flat`** is a contiguous preorder index (every slot in preorder, where each subtree ends, and the
-  child lists packed together), rebuilt in `O(n)` without allocating only when `Forest::version`
-  moved. Full passes read its slot array; skipping walks read its child lists with a reused stack.
+  child lists packed together). Full passes read its slot array; skipping walks read its child lists
+  with a reused stack. `Flat::update` patches it: the forest logs each parent whose child list
+  changed (a run of changes to one parent once) and each freed slot, and the view writes those lists
+  again and walks again only the subtrees under them, shifting what follows when one grew or shrank.
+  It rebuilds in `O(n)` instead when the roots changed, the log has moved past it, or stale list
+  entries outnumber live ones. Neither allocates once its buffers have grown.
 - **`Column<T>`** holds per-node data by slot, structure-of-arrays; the forest owns only structure.
 
 Walks follow tree order. Only column sweeps read in slot order, and nothing that has to replay the
@@ -214,16 +218,23 @@ Generic code costs nothing at run time (it is compiled per use), so generality s
 The forest's bar is a hand-written arena with a child `Vec` per node (`benches/forest.rs`, 16 children
 per node). Medians at 10k / 100k nodes: a full preorder over `Flat` 0.65 / 6.3 µs against 8.9 / 101 µs;
 a dirty walk with 1% dirty 1.45 / 16 µs against 1.7 / 21 µs; removing a subtree 10 / 84 µs against
-13 / 106 µs; building 69 µs / 0.98 ms against 68 µs / 1.1 ms. (The forest's small accessors are
+13 / 106 µs; building 69-125 µs / 0.9-1.0 ms against 62-73 µs / 1.0-1.1 ms, level or behind at 10k
+depending on the machine's state (below) and slightly ahead at 100k. (The forest's small accessors are
 `#[inline]`, so callers in other crates don't pay a call per step; that alone halved its build with
 warm memory and cut link walks by a fifth.) Reordering children trades the other way: the forest
 relinks two neighbours in about 9 ns whatever the list's length, where the arena shifts the list
 (4.4 ns at 16 children, 14 ns at 256, 204 ns at 4096), so the arena is ahead only on short lists,
 by the forest's id and cycle checks. `Tree` builds about ten times slower than either.
 
+Bringing `Flat` up to date after a change deep in the tree costs what changed: a child added or
+removed 1.5 / 3.2 µs at 10k / 100k nodes, a parent's children reordered about 105 ns; a full rebuild is
+about 20 / 340 µs. (A change right under the root still walks nearly everything: about 200 µs at
+100k.)
+
 Run each benchmark alone when comparing: the forest allocates its slots up front, so a run right
 after another benchmark that freed memory builds up to twice as fast as one that has to fault in
-fresh pages.
+fresh pages, and the machine's state moves it too: building 10k nodes measured 69 µs in one session
+and 115-125 µs in another (the same code both times, the arena's 62-73 µs throughout).
 
 ## 7. Testing
 
@@ -250,13 +261,11 @@ behaviour is pinned. Also pinned: the chain's hash encoding, and the written-out
 | `Error` is `#[non_exhaustive]` | Features add variants, and features unify across a build, so a match elsewhere needs a catch-all |
 | Graph and Tree serialize their content, read back checked | Equal structures must write the same bytes, and a written form must not be able to build a broken one |
 | The forest's small accessors are `#[inline]` | A call per step across crates halved its build speed; the forest exists to be fast in someone else's loop |
+| `Flat` patches from a change log the forest keeps | A change deep in a UI tree shouldn't cost a walk of all of it; the log is bounded, and falling behind it means a rebuild, never a wrong view |
 
 ## 9. Next
 
-- An incremental `Flat::update`, patching the changed subtrees instead of rebuilding, once rebuilds
-  show up in a frame budget.
-- Alfred's store onto `crypt` (the format already matches), dropping its own copy of the cipher: Alfred's
-  change to make, asked of it.
+Nothing planned. Alfred's store moved onto `crypt`, dropping its own copy of the cipher.
 
 Considered and left: persisted snapshots (the longest history is 187 batches, 0.6 MB, and replays
 quickly), and a reverse-relation index pattern (graphs already answer "what points at this" in

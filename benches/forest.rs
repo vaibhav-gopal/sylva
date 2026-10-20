@@ -112,6 +112,40 @@ fn flat_rebuild(bencher: Bencher, n: usize) {
 }
 
 #[divan::bench(args = SIZES)]
+fn flat_update_deep_insert(bencher: Bencher, n: usize) {
+    let (mut f, ids) = build_forest(n);
+    let mut flat = Flat::new();
+    flat.update(&f);
+    // A node near the bottom gains a child, then loses it: what reconciliation does most.
+    let deep = ids[n / 2];
+    let mut added: Option<Id> = None;
+    bencher.bench_local(|| {
+        match added.take() {
+            Some(id) => {
+                f.remove(id, |_| {}).unwrap();
+            }
+            None => added = Some(f.push_child(deep).unwrap()),
+        }
+        black_box(flat.update(&f))
+    });
+}
+
+#[divan::bench(args = SIZES)]
+fn flat_update_deep_reorder(bencher: Bencher, n: usize) {
+    let (mut f, ids) = build_forest(n);
+    let mut flat = Flat::new();
+    flat.update(&f);
+    // A parent one level above the leaves reorders its children.
+    let parent = f.parent(ids[n - 1]).unwrap();
+    bencher.bench_local(|| {
+        let first = f.first_child(parent);
+        let last = f.last_child(parent).unwrap();
+        f.move_to(last, Some(parent), first).unwrap();
+        black_box(flat.update(&f))
+    });
+}
+
+#[divan::bench(args = SIZES)]
 fn preorder_flat(bencher: Bencher, n: usize) {
     let (f, _) = build_forest(n);
     let mut flat = Flat::new();

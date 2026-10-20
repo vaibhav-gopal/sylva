@@ -1,6 +1,6 @@
 [package]
 name = "sylva"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "GPL-3.0-only OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0"
 description = "Graphs and trees that remember: general-purpose structures with a versioned op log on top"

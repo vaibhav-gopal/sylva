@@ -123,7 +123,16 @@ pub struct Forest {
     len: usize,
     /// Bumped by every change to the structure, so a [`Flat`] knows when it's stale.
     version: u64,
+    /// What changed, for [`Flat::update`] to patch rather than rebuild: each parent whose child
+    /// list changed (`NONE` for the roots) and each freed slot, a run of changes to one parent once.
+    /// Bounded: the oldest half goes when it fills, and a `Flat` that far behind rebuilds.
+    changes: Vec<u32>,
+    /// How many entries have gone from the front of `changes`.
+    changes_base: u64,
 }
+
+/// How many entries [`Forest`]'s change log holds before its oldest half goes.
+const CHANGES_CAP: usize = 4096;
 
 impl Default for Forest {
     fn default() -> Self {
@@ -142,7 +151,34 @@ impl Forest {
             last_root: NONE,
             len: 0,
             version: 0,
+            changes: Vec::new(),
+            changes_base: 0,
         }
+    }
+
+    /// Records that `slot`'s child list changed (`NONE`: the roots), or that `slot` was freed.
+    #[inline]
+    fn touched(&mut self, slot: u32) {
+        if self.changes.last() == Some(&slot) {
+            return;
+        }
+        if self.changes.len() >= CHANGES_CAP {
+            self.changes.drain(..CHANGES_CAP / 2);
+            self.changes_base += (CHANGES_CAP / 2) as u64;
+        }
+        self.changes.push(slot);
+    }
+
+    /// The change log's end, as a count of every entry ever made.
+    fn changes_end(&self) -> u64 {
+        self.changes_base + self.changes.len() as u64
+    }
+
+    /// The entries from `from` (a count, as [`Forest::changes_end`] gives) on, or `None` if some
+    /// of them are gone.
+    fn changes_from(&self, from: u64) -> Option<&[u32]> {
+        let at = from.checked_sub(self.changes_base)?;
+        self.changes.get(at as usize..)
     }
 
     /// An empty forest with room for `n` nodes before it reallocates.
@@ -229,6 +265,7 @@ impl Forest {
     /// Links `i` (unlinked) under `parent` (`NONE`: the root list), before `before` (`NONE`: last).
     #[inline]
     fn link(&mut self, i: u32, parent: u32, before: u32) {
+        self.touched(parent);
         let prev = if before == NONE {
             if parent == NONE {
                 self.last_root
@@ -261,6 +298,7 @@ impl Forest {
         let Links {
             parent, prev, next, ..
         } = self.links[s];
+        self.touched(parent);
         match prev {
             NONE if parent == NONE => self.first_root = next,
             NONE => self.links[parent as usize].first = next,
@@ -392,6 +430,7 @@ impl Forest {
     #[inline]
     fn free_slot(&mut self, i: u32) {
         let s = i as usize;
+        self.touched(i);
         self.generation[s] = self.generation[s].wrapping_add(1);
         self.links[s] = UNLINKED;
         self.free.push(i);
@@ -581,24 +620,93 @@ impl Forest {
 /// for each position where its subtree ends. Full passes read [`Flat::slots`] front to back;
 /// [`Flat::walk`] skips clean subtrees in one step.
 ///
-/// [`Flat::update`] rebuilds it when the forest's structure changed since the last update, in
-/// O(n) and without allocating once its buffers have grown. Between a change and the next
-/// update it describes the forest as it was.
+/// [`Flat::update`] brings it up to date when the forest's structure changed since the last
+/// update: it patches what changed (the subtrees under each parent whose children changed) when
+/// it can, and otherwise rebuilds in O(n); neither allocates once its buffers have grown. Between
+/// a change and the next update it describes the forest as it was. A `Flat` follows one forest.
 #[derive(Clone, Debug, Default)]
 pub struct Flat {
     slots: Vec<u32>,
     ends: Vec<u32>,
     /// Every node's children, contiguous and in order (compressed rows): the children of slot
-    /// `s` are `children[child_range[s][0]..child_range[s][1]]`, the roots `children[..roots]`.
+    /// `s` are `children[child_range[s][0]..child_range[s][1]]`, the roots
+    /// `children[roots[0]..roots[1]]`. A list that changed is written again at the end, leaving
+    /// `garbage` stale entries until the next rebuild.
     children: Vec<u32>,
     child_range: Vec<[u32; 2]>,
-    roots: u32,
+    roots: [u32; 2],
+    garbage: usize,
     /// Reused by [`Flat::walk`].
     stack: Vec<u32>,
-    /// Reused by [`Flat::update`]: per level of the walk, `[position, next child, end]` into the
-    /// child lists.
+    /// Reused by every walk of the child lists: per level, `[position, next child, end]`.
     frames: Vec<[u32; 3]>,
+    /// Reused by a patch: the changed slots and a mark per slot for them; the subtrees to walk
+    /// again (`[old position, slot, ancestors' positions from, to]`) with their ancestors'
+    /// positions; the path up from one of them; and one subtree's new preorder.
+    touched: Vec<u32>,
+    marked: Vec<bool>,
+    regions: Vec<[u32; 4]>,
+    above: Vec<u32>,
+    path: Vec<u32>,
+    region_slots: Vec<u32>,
+    region_ends: Vec<u32>,
     version: Option<u64>,
+    /// How far into the forest's change log this view has read.
+    seen: u64,
+    /// How many updates walked only the changed subtrees again (the tests check patches happen).
+    #[cfg(test)]
+    region_patches: usize,
+}
+
+/// Appends the preorder of the trees whose roots are `children[list[0]..list[1]]` to `slots`, and
+/// where each subtree ends to `ends`, positions counted from `base`. It walks the contiguous child
+/// lists, not the links: a frame per level holds its position and the children left to visit.
+fn preorder_into(
+    children: &[u32],
+    child_range: &[[u32; 2]],
+    list: [u32; 2],
+    base: u32,
+    slots: &mut Vec<u32>,
+    ends: &mut Vec<u32>,
+    frames: &mut Vec<[u32; 3]>,
+) {
+    /// Appends `s`; a leaf (most nodes) ends where it starts and needs no frame.
+    #[inline]
+    fn enter(
+        s: u32,
+        child_range: &[[u32; 2]],
+        offset: u32,
+        slots: &mut Vec<u32>,
+        ends: &mut Vec<u32>,
+        frames: &mut Vec<[u32; 3]>,
+    ) {
+        let at = slots.len();
+        slots.push(s);
+        let [first, end] = child_range[s as usize];
+        if first == end {
+            ends.push(at as u32 + offset + 1);
+        } else {
+            ends.push(0);
+            frames.push([at as u32, first, end]);
+        }
+    }
+    // A position is an index into `slots` plus `offset` (wrapping: `base` may be below it).
+    let offset = base.wrapping_sub(slots.len() as u32);
+    frames.clear();
+    for &root in &children[list[0] as usize..list[1] as usize] {
+        enter(root, child_range, offset, slots, ends, frames);
+        while let Some(top) = frames.last_mut() {
+            if top[1] < top[2] {
+                let c = children[top[1] as usize];
+                top[1] += 1;
+                enter(c, child_range, offset, slots, ends, frames);
+            } else {
+                let at = top[0] as usize;
+                frames.pop();
+                ends[at] = (slots.len() as u32).wrapping_add(offset);
+            }
+        }
+    }
 }
 
 impl Flat {
@@ -607,22 +715,36 @@ impl Flat {
         Flat::default()
     }
 
-    /// Rebuilds the view if `forest`'s structure changed since the last update. Returns whether
-    /// it rebuilt.
+    /// Brings the view up to date if `forest`'s structure changed since the last update, by
+    /// patching what changed when it can and rebuilding otherwise. Returns whether the view changed.
     pub fn update(&mut self, forest: &Forest) -> bool {
         if self.version == Some(forest.version()) {
             return false;
         }
+        // The last entry read is read again: a later change to the same parent merges into it.
+        let patched = self.version.is_some()
+            && match forest.changes_from(self.seen.saturating_sub(1)) {
+                Some(changes) => self.patch(forest, changes),
+                None => false,
+            };
+        if !patched {
+            self.rebuild(forest);
+        }
         self.version = Some(forest.version());
-        // The child lists first, in one pass over the slots: each sibling chain is followed once,
-        // and the roots come first. (A free slot has no first child.)
+        self.seen = forest.changes_end();
+        true
+    }
+
+    /// Builds the view from scratch: the child lists in one pass over the slots (each sibling
+    /// chain followed once, the roots first), then preorder over them.
+    fn rebuild(&mut self, forest: &Forest) {
         self.children.clear();
         let mut root = forest.first_root;
         while root != NONE {
             self.children.push(root);
             root = forest.links[root as usize].next;
         }
-        self.roots = self.children.len() as u32;
+        self.roots = [0, self.children.len() as u32];
         self.child_range.clear();
         self.child_range.reserve(forest.slots());
         for links in &forest.links {
@@ -634,39 +756,204 @@ impl Flat {
             }
             self.child_range.push([start, self.children.len() as u32]);
         }
-        // Then preorder and where each subtree ends, by walking the contiguous child lists instead
-        // of the links: a frame per level holds its position and the children left to visit.
+        self.garbage = 0;
+        self.full_preorder();
+    }
+
+    fn full_preorder(&mut self) {
         self.slots.clear();
         self.ends.clear();
-        self.ends.resize(forest.len(), 0);
-        let mut frames = core::mem::take(&mut self.frames);
-        frames.clear();
-        for r in 0..self.roots as usize {
-            let root = self.children[r];
-            let [first, end] = self.child_range[root as usize];
-            frames.push([self.slots.len() as u32, first, end]);
-            self.slots.push(root);
-            while let Some(top) = frames.last_mut() {
-                if top[1] < top[2] {
-                    let c = self.children[top[1] as usize];
-                    top[1] += 1;
-                    let [first, end] = self.child_range[c as usize];
-                    let at = self.slots.len() as u32;
-                    self.slots.push(c);
-                    if first == end {
-                        // A leaf (most nodes): it ends where it starts, with no frame.
-                        self.ends[at as usize] = at + 1;
-                    } else {
-                        frames.push([at, first, end]);
-                    }
-                } else {
-                    self.ends[top[0] as usize] = self.slots.len() as u32;
-                    frames.pop();
+        preorder_into(
+            &self.children,
+            &self.child_range,
+            self.roots,
+            0,
+            &mut self.slots,
+            &mut self.ends,
+            &mut self.frames,
+        );
+    }
+
+    /// Applies `changes` (the forest's log since the last update): writes the changed child lists
+    /// again, then walks again only the subtrees under them. Returns false, changing nothing that
+    /// a rebuild won't replace, when it's better to rebuild (too much stale in the child lists).
+    fn patch(&mut self, forest: &Forest, changes: &[u32]) -> bool {
+        let n = forest.slots();
+        if self.child_range.len() < n {
+            self.child_range.resize(n, [0, 0]);
+        }
+        if self.marked.len() < n {
+            self.marked.resize(n, false);
+        }
+        self.touched.clear();
+        let mut roots_changed = false;
+        for &s in changes {
+            if s == NONE {
+                roots_changed = true;
+            } else if !self.marked[s as usize] {
+                self.marked[s as usize] = true;
+                self.touched.push(s);
+            }
+        }
+        // The changed child lists written again at the end; a freed slot's emptied.
+        if roots_changed {
+            let start = self.children.len() as u32;
+            let mut r = forest.first_root;
+            while r != NONE {
+                self.children.push(r);
+                r = forest.links[r as usize].next;
+            }
+            self.garbage += (self.roots[1] - self.roots[0]) as usize;
+            self.roots = [start, self.children.len() as u32];
+        }
+        for k in 0..self.touched.len() {
+            let s = self.touched[k];
+            let [a, b] = self.child_range[s as usize];
+            self.garbage += (b - a) as usize;
+            let start = self.children.len() as u32;
+            if forest.id_at(s as usize).is_some() {
+                let mut c = forest.links[s as usize].first;
+                while c != NONE {
+                    self.children.push(c);
+                    c = forest.links[c as usize].next;
+                }
+            }
+            self.child_range[s as usize] = [start, self.children.len() as u32];
+        }
+        let compact = self.garbage > self.children.len() - self.garbage;
+        let regions = !compact && !roots_changed && self.find_regions(forest);
+        for &s in &self.touched {
+            self.marked[s as usize] = false;
+        }
+        if compact {
+            return false;
+        }
+        if regions {
+            self.walk_regions_again();
+            #[cfg(test)]
+            {
+                self.region_patches += 1;
+            }
+        } else {
+            // The roots changed, or the subtrees overlap: preorder again over the patched lists.
+            self.full_preorder();
+        }
+        true
+    }
+
+    /// Finds the subtrees to walk again: under each live changed slot none of whose ancestors
+    /// changed (the others lie inside one of those), each at its position in the view as it was.
+    /// False when one can't be placed, or two overlap.
+    fn find_regions(&mut self, forest: &Forest) -> bool {
+        self.regions.clear();
+        self.above.clear();
+        for k in 0..self.touched.len() {
+            let s = self.touched[k];
+            if forest.id_at(s as usize).is_none() {
+                continue;
+            }
+            self.path.clear();
+            let mut a = forest.links[s as usize].parent;
+            let mut covered = false;
+            while a != NONE {
+                if self.marked[a as usize] {
+                    covered = true;
+                    break;
+                }
+                self.path.push(a);
+                a = forest.links[a as usize].parent;
+            }
+            if covered {
+                continue;
+            }
+            let from = self.above.len() as u32;
+            let Some(at) = self.old_position(s) else {
+                return false;
+            };
+            self.regions.push([at, s, from, self.above.len() as u32]);
+        }
+        self.regions.sort_unstable();
+        self.regions
+            .windows(2)
+            .all(|w| w[1][0] >= self.ends[w[0][0] as usize])
+    }
+
+    /// `s`'s position in the view as it was, found from the top: across the roots before its
+    /// root, then down its ancestors (`path`, nearest first), stepping over earlier siblings by
+    /// where each one ends. Sound because no list along the way changed. Pushes the ancestors'
+    /// positions to `above`.
+    fn old_position(&mut self, s: u32) -> Option<u32> {
+        let top = self.path.last().copied().unwrap_or(s);
+        let mut at = 0u32;
+        let roots = &self.children[self.roots[0] as usize..self.roots[1] as usize];
+        let mut found = false;
+        for &r in roots {
+            if r == top {
+                found = true;
+                break;
+            }
+            at = *self.ends.get(at as usize)?;
+        }
+        if !found {
+            return None;
+        }
+        let mut parent = top;
+        for i in (0..self.path.len()).rev() {
+            self.above.push(at);
+            let next = if i == 0 { s } else { self.path[i - 1] };
+            let [first, end] = self.child_range[parent as usize];
+            let mut pos = at + 1;
+            let mut found = false;
+            for &c in &self.children[first as usize..end as usize] {
+                if c == next {
+                    found = true;
+                    break;
+                }
+                pos = *self.ends.get(pos as usize)?;
+            }
+            if !found {
+                return None;
+            }
+            at = pos;
+            parent = next;
+        }
+        (self.slots.get(at as usize) == Some(&s)).then_some(at)
+    }
+
+    /// Walks each region's subtree again from its patched child lists and splices it in, from the
+    /// last region to the first so the positions not yet patched stay as they were. A region that
+    /// grew or shrank shifts where everything after it ends, and its ancestors' ends.
+    fn walk_regions_again(&mut self) {
+        for k in (0..self.regions.len()).rev() {
+            let [at, s, from, to] = self.regions[k];
+            let old_end = self.ends[at as usize];
+            self.region_slots.clear();
+            self.region_ends.clear();
+            preorder_into(
+                &self.children,
+                &self.child_range,
+                self.child_range[s as usize],
+                at + 1,
+                &mut self.region_slots,
+                &mut self.region_ends,
+                &mut self.frames,
+            );
+            let new_end = at + 1 + self.region_slots.len() as u32;
+            let inside = at as usize + 1..old_end as usize;
+            self.slots
+                .splice(inside.clone(), self.region_slots.iter().copied());
+            self.ends.splice(inside, self.region_ends.iter().copied());
+            if new_end != old_end {
+                let delta = new_end.wrapping_sub(old_end);
+                for e in &mut self.ends[new_end as usize..] {
+                    *e = e.wrapping_add(delta);
+                }
+                self.ends[at as usize] = new_end;
+                for &q in &self.above[from as usize..to as usize] {
+                    self.ends[q as usize] = self.ends[q as usize].wrapping_add(delta);
                 }
             }
         }
-        self.frames = frames;
-        true
     }
 
     /// Every live slot, in preorder.
@@ -686,7 +973,11 @@ impl Flat {
     pub fn walk(&mut self, mut visit: impl FnMut(u32) -> Visit) {
         let mut stack = core::mem::take(&mut self.stack);
         stack.clear();
-        stack.extend(self.children[..self.roots as usize].iter().rev());
+        stack.extend(
+            self.children[self.roots[0] as usize..self.roots[1] as usize]
+                .iter()
+                .rev(),
+        );
         while let Some(s) = stack.pop() {
             if visit(s) == Visit::Enter {
                 let [start, end] = self.child_range[s as usize];
@@ -945,6 +1236,126 @@ mod tests {
             let kids: Vec<u32> = f.children(id).map(|c| c.slot() as u32).collect();
             assert_eq!(flat.children_of(s), kids, "{id}'s children, in order");
         }
+    }
+
+    /// A small fixed-seed generator, so a failure here reproduces.
+    struct Rng(u64);
+
+    impl Rng {
+        fn below(&mut self, n: usize) -> usize {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            (self.0 % n as u64) as usize
+        }
+    }
+
+    /// The view `flat` must equal one built from scratch: same preorder, ends, child lists and
+    /// skipping walk.
+    fn assert_same_as_fresh(f: &Forest, flat: &mut Flat, step: usize) {
+        let mut fresh = Flat::new();
+        fresh.update(f);
+        assert_eq!(flat.slots(), fresh.slots(), "preorder after step {step}");
+        assert_eq!(flat.ends(), fresh.ends(), "ends after step {step}");
+        for &s in fresh.slots() {
+            assert_eq!(
+                flat.children_of(s),
+                fresh.children_of(s),
+                "children of {s} after step {step}"
+            );
+        }
+        let (mut a, mut b) = (vec![], vec![]);
+        let skip = |s: u32| {
+            if s.is_multiple_of(3) {
+                Visit::Skip
+            } else {
+                Visit::Enter
+            }
+        };
+        flat.walk(|s| {
+            a.push(s);
+            skip(s)
+        });
+        fresh.walk(|s| {
+            b.push(s);
+            skip(s)
+        });
+        assert_eq!(a, b, "skipping walk after step {step}");
+    }
+
+    #[test]
+    fn a_patched_flat_matches_a_rebuilt_one() {
+        let mut rng = Rng(0x5eed_f1a7);
+        let mut f = Forest::new();
+        let mut live: Vec<Id> = Vec::new();
+        for _ in 0..4 {
+            let r = f.push_root();
+            live.push(r);
+            for _ in 0..5 {
+                let c = f.push_child(r).unwrap();
+                live.push(c);
+                for _ in 0..3 {
+                    live.push(f.push_child(c).unwrap());
+                }
+            }
+        }
+        let mut flat = Flat::new();
+        flat.update(&f);
+        for step in 0..4000 {
+            // A batch of 1 to 6 changes, mostly deep in the tree, sometimes at the roots.
+            for _ in 0..1 + rng.below(6) {
+                live.retain(|&id| f.contains(id));
+                let pick = live[rng.below(live.len())];
+                match rng.below(10) {
+                    0..=2 => live.push(f.push_child(pick).unwrap()),
+                    3 => live.push(f.insert_before(pick).unwrap()),
+                    4 => live.push(f.insert_after(pick).unwrap()),
+                    5 | 6 => {
+                        let to = live[rng.below(live.len())];
+                        let before = f.children(to).nth(rng.below(4));
+                        let _ = f.move_to(pick, Some(to), before);
+                    }
+                    7 => {
+                        // Reorder among siblings.
+                        let parent = f.parent(pick);
+                        let before = match parent {
+                            Some(p) => f.first_child(p),
+                            None => f.roots().next(),
+                        };
+                        let _ = f.move_to(pick, parent, before);
+                    }
+                    8 if live.len() > 30 => {
+                        f.remove(pick, |_| {}).unwrap();
+                    }
+                    9 if rng.below(8) == 0 => live.push(f.push_root()),
+                    _ => live.push(f.push_child(pick).unwrap()),
+                }
+            }
+            flat.update(&f);
+            assert_same_as_fresh(&f, &mut flat, step);
+        }
+        assert!(
+            flat.region_patches > 1000,
+            "patched {} times",
+            flat.region_patches
+        );
+    }
+
+    #[test]
+    fn a_flat_too_far_behind_rebuilds() {
+        let mut f = Forest::new();
+        let root = f.push_root();
+        let mut flat = Flat::new();
+        flat.update(&f);
+        // More changes than the log keeps, to many parents, before the next update.
+        let mut parents = vec![root];
+        for i in 0..CHANGES_CAP * 2 {
+            let p = parents[i % parents.len()];
+            parents.push(f.push_child(p).unwrap());
+        }
+        assert!(flat.update(&f));
+        assert_same_as_fresh(&f, &mut flat, 0);
+        assert!(!flat.update(&f), "nothing changed since");
     }
 
     #[test]
