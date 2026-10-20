@@ -13,6 +13,7 @@ categories = ["data-structures", "no-std", "wasm"]
 include = [
     "src/**/*.rs",
     "benches/**/*.rs",
+    "tests/**/*.rs",
     "Cargo.toml",
     "README.md",
     "LICENSE.md",
