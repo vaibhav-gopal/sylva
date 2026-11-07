@@ -1,0 +1,32 @@
+{"batch":"01a15d64-c663-7582-9640-36176008d6d0","after":"01a15ca6-078b-7127-9c9f-030665a1128b","author":"agent:claude-code","at":1792568247907,"message":"Cleanup. Eleven decisions read again against what moved (DESIGN.md's decisions table gained rows below them; Structures' and Forest's rules and statuses changed): each still holds, so reaffirmed, words kept. The 18 relations the code already shows are dropped (Tend computes them from the code; declare only what code can't show). And sylva itself is done: every part of it is. (proposal 01a15d64-1f10-773a-9baf-feb388b4b45f, proposed by agent:claude-code, accepted by user)"}
+{"op":"accepted","proposal":"01a15d64-1f10-773a-9baf-feb388b4b45f","proposed_by":"agent:claude-code","accepted_by":"user"}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-163f2dfd7926","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-1640bce8ab7d","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-1641fe83e31a","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-1642e3d47e7f","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-1643ce6e9607","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-1644e276cb40","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10a54-fb7b-713e-9527-1645391b7c14","rests_on":[{"of":"doc:design/8. Decisions","at":"fp:5557677bf86f","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10add-9e64-767a-8e1c-7009071556ae","rests_on":[{"of":"design:sylva / Foundation","at":"fp:72f4e148160c","checked":"2026-10-21"},{"of":"design:sylva / Structures","at":"fp:16495d73b67b","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10add-9e64-767a-8e1c-700acef9c4d7","rests_on":[{"of":"design:sylva / Structures","at":"fp:16495d73b67b","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a10ac4-1dd2-7225-9462-605e290c043f","rests_on":[{"of":"design:sylva / Structures / Forest","at":"fp:e49e83b41e05","checked":"2026-10-21"}]}
+{"op":"claim.reaffirm","id":"01a15b5b-99bd-76ed-8289-4600b9437288","rests_on":[{"of":"design:sylva / Structures / Forest","at":"fp:e49e83b41e05","checked":"2026-10-21"}]}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-991e1313467a","kind":"depends_on","to":"01a10a54-fb7a-755d-acab-991d698066fc"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-9923f494ac39","kind":"depends_on","to":"01a10a54-fb7a-755d-acab-991d698066fc"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-99270d73bca9","kind":"uses","to":"01a10a54-fb7a-755d-acab-9924cd7b5be1"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992889c575f0","kind":"uses","to":"01a10a54-fb7a-755d-acab-9924cd7b5be1"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992b79e41f6b","kind":"uses","to":"01a10a54-fb7a-755d-acab-9924cd7b5be1"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992b79e41f6b","kind":"uses","to":"01a10a54-fb7a-755d-acab-992889c575f0"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992ce7c6cabf","kind":"uses","to":"01a10a54-fb7a-755d-acab-9929736f093e"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992dbfe69eee","kind":"uses","to":"01a10a54-fb7a-755d-acab-992ce7c6cabf"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992f2903473a","kind":"depends_on","to":"01a10a54-fb7a-755d-acab-991d698066fc"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-992f2903473a","kind":"depends_on","to":"01a10a54-fb7a-755d-acab-991e1313467a"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-9933f34ed396","kind":"uses","to":"01a10a54-fb7a-755d-acab-9932d21e71f3"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-9934fcaba167","kind":"uses","to":"01a10a54-fb7a-755d-acab-9922f8ebcfae"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-9934fcaba167","kind":"uses","to":"01a10a54-fb7a-755d-acab-9933f34ed396"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-99357d892a66","kind":"uses","to":"01a10a54-fb7a-755d-acab-9921facb4c3b"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-99357d892a66","kind":"uses","to":"01a10a54-fb7a-755d-acab-9933f34ed396"}
+{"op":"node.unrelate","from":"01a10a54-fb7a-755d-acab-99357d892a66","kind":"uses","to":"01a10a54-fb7a-755d-acab-9932d21e71f3"}
+{"op":"node.unrelate","from":"01a10a5e-f376-715b-802a-c91d4c72e4e8","kind":"depends_on","to":"01a10a54-fb7a-755d-acab-991d698066fc"}
+{"op":"node.unrelate","from":"01a10a5e-f376-715b-802a-c91d4c72e4e8","kind":"uses","to":"01a10a54-fb7a-755d-acab-9922f8ebcfae"}
+{"op":"node.status","id":"01a10a4b-cdce-72a2-82d1-d5122b03d702","status":"done"}
