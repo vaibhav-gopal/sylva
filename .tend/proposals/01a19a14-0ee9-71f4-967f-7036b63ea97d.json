@@ -1,0 +1,25 @@
+{
+  "id": "01a19a14-0ee9-71f4-967f-7036b63ea97d",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "baseline:vg-paradigms",
+  "rationale": "Upgrade to vg-paradigms release 2026.10.18 (Principle: two secret backends, by who uses the secret), by your auto subscription: 10 rule change(s), 1 new todo(s); its auto subscription proposes it, since it would break 1 thing(s)",
+  "why": "documents (the conduct, what a project builds on, its workflows) are the user's: an agent's change to one is a proposal; in a baseline's project, an agent with `trusted` records the baseline's own documents",
+  "ops": [
+    {
+      "op": "doc.set",
+      "path": "extends.toml",
+      "text": "baseline = \"vg-paradigms\"\nrev = \"9f4ebff\"\nrelease = \"2026.10.18\"\nprofiles = [\"rust\"]\nmodules = [\"op-log\"]\n\n[license]\ncombo = \"library\"\n"
+    },
+    {
+      "op": "todo.add",
+      "id": "01a19a14-0ee6-7014-b3cd-e172c1c824ac",
+      "title": "Baseline release 2026.10.18: A project closed to contributions (the default) has no CI: no workflows, and GitHub Actions turned off. Its declared tests and gates run in git hooks (tend's checks and the tests a change reaches before a commit, all of them before a push), and checks for other systems run on your own machines through Nix remote builders. A check no machine here can run is the exception: its workflow stays, with a decision in the journal that waives ci.closed and says why.",
+      "body": "ci.closed (warn, global/rules.toml): .github/workflows/ci.yml exists (forbidden: .github/workflows/*.yml)",
+      "by": "agent",
+      "refs": [],
+      "waits_on": [],
+      "milestone": null
+    }
+  ],
+  "at": 1793586368233
+}

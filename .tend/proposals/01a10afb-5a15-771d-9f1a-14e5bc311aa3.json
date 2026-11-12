@@ -1,0 +1,38 @@
+{
+  "id": "01a10afb-5a15-771d-9f1a-14e5bc311aa3",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "Cargo.toml's license may change once vg-paradigms answers the license.manifest mismatch (graft 01a10afb).",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.add",
+      "id": "01a10afb-557c-7306-ace1-e50007c41b70",
+      "title": "Match Cargo.toml's license to what vg-paradigms settles",
+      "body": "Cargo.toml says GPL-3.0-only OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0, as the license.manifest rule asks, while LICENSE.md and REUSE.toml grant GPL-3.0-only WITH AdditionRef-Open-Project-Exception-1.0. Re-render and re-check once the baseline settles one expression (or license-file), before publishing.",
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a4b-cdce-72a2-82d1-d5122b03d702"
+      ],
+      "waits_on": [
+        {
+          "on": "graft:01a10afb-2db4"
+        }
+      ],
+      "milestone": null
+    }
+  ],
+  "at": 1791185607189,
+  "from_draft": "01a10afb-4fb8-7787-99cf-4b8f9ccf2e6f",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "7b3a7e8",
+    "tend": "tend 0.1.0"
+  }
+}

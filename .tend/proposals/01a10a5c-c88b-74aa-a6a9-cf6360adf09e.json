@@ -1,0 +1,91 @@
+{
+  "id": "01a10a5c-c88b-74aa-a6a9-cf6360adf09e",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "Fixed in 498a6e3: Split and Merge are atomic, Create checks names only, walks cost what they reach. The stated-props removal todo stays open: the knowledge model's pinned test (stated_facts_survive_observations) has a scanner remove an observed node that carries a stated prop, so it's a design question, not a bug.",
+  "why": "it builds on 1 change(s) still waiting, so it waits with them",
+  "ops": [
+    {
+      "op": "todo.status",
+      "id": "01a10a57-5b6d-70db-b641-d3e85723a2c4",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "todo.status",
+      "id": "01a10a57-5b6d-70db-b641-d3e90f1f7333",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "todo.status",
+      "id": "01a10a57-5b6d-70db-b641-d3eb817ff6c9",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-9934fcaba167",
+      "check": {
+        "kind": "test",
+        "name": "a failed split or merge changes nothing",
+        "run": "cargo test --all-features --lib a_failed_split_or_merge_changes_nothing",
+        "code": "src/knowledge/trees.rs"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-9921facb4c3b",
+      "check": {
+        "kind": "test",
+        "name": "long walks reach each node once",
+        "run": "cargo test --all-features --lib long_walks_reach_each_node_once",
+        "code": "src/graph.rs"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a5c-c19e-73ab-9a83-c9df46bc6622",
+      "node": "01a10a54-fb7a-755d-acab-9934fcaba167",
+      "text": "Split and Merge apply to a copy",
+      "why": "Both are several steps that can each fail, and replay keeps whatever state an op leaves. Applying them to a clone and swapping it in on success makes them atomic for O(tree) per split or merge, which are rare; every other op validates before it changes anything.",
+      "rests_on": [
+        {
+          "of": "design:sylva / Knowledge / Catalog trees",
+          "at": "fp:3132424618c0",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a5c-c19e-73ab-9a83-c9e0bfe64e8d",
+      "node": "01a10a54-fb7a-755d-acab-9921facb4c3b",
+      "text": "A walk's reached set: 32 slots in place, then a bit per slot",
+      "why": "Allocating a flag per slot made every walk, even one step from a node, cost the graph. Thirty-two reached slots are tracked in place without allocating; past that a bitmap (a 64th of the slot count in words) takes over, which keeps whole-graph walks fast. shortest_path keeps back links in its breadth-first trail instead of an array per slot.",
+      "rests_on": [
+        {
+          "of": "design:sylva / Structures / Graph",
+          "at": "fp:649bc7d404da",
+          "checked": "2026-10-05"
+        }
+      ]
+    }
+  ],
+  "at": 1791175215243,
+  "after": [
+    "01a10a57-624a-776b-af0e-78285f9f65a7"
+  ],
+  "from_draft": "01a10a5c-b89d-72c4-8bf6-cba3ca602554",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "498a6e3",
+    "tend": "tend 0.1.0"
+  }
+}

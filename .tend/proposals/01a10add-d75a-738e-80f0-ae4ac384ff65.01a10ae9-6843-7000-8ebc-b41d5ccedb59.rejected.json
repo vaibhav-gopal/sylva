@@ -1,0 +1,10 @@
+{
+  "id": "01a10ae9-6843-7000-8ebc-b41d5ccedb59",
+  "proposal": "01a10add-d75a-738e-80f0-ae4ac384ff65",
+  "event": {
+    "kind": "rejected",
+    "reason": "stale",
+    "by": "user",
+    "at": 1791184431171
+  }
+}

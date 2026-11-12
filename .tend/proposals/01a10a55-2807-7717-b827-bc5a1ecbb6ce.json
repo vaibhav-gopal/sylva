@@ -1,0 +1,27 @@
+{
+  "id": "01a10a55-2807-7717-b827-bc5a1ecbb6ce",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "License: the baseline's library combo (GPL-3.0-only with the open-project exception, or royalty-free, or commercial), as the user chose for tend, sylva, autodyne and parda",
+  "why": "documents (the conduct, a baseline's toolbox and rules) are the user's: an agent's change to one is a proposal",
+  "ops": [
+    {
+      "op": "doc.set",
+      "path": "extends.toml",
+      "text": "baseline = \"vg-paradigms\"\nrev = \"06444df\"\nprofiles = [\"rust\"]\nmodules = [\"op-log\"]\n\n[license]\ncombo = \"library\"\n"
+    }
+  ],
+  "at": 1791174715399,
+  "from_draft": "01a10a55-1d29-7466-8bc8-2254f43e3882",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "9d2a15d",
+    "tend": "tend 0.1.0"
+  }
+}

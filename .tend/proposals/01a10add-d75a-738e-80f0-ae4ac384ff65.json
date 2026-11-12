@@ -1,0 +1,106 @@
+{
+  "id": "01a10add-d75a-738e-80f0-ae4ac384ff65",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "uuid is pulled in only by log and knowledge, Graph and Tree have no default key, and the structures build without std (a default std feature), checked for wasm32. What parda asked of the crate, short of publishing.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.status",
+      "id": "01a10a5e-f377-7571-9675-c29d7f7085b5",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "todo.status",
+      "id": "01a10a5e-f377-7571-9675-c29eb231207a",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "kind": "test",
+        "name": "wasm32 without std",
+        "run": "cargo build --no-default-features --target wasm32-unknown-unknown",
+        "code": "src/lib.rs",
+        "notes": "The target is pinned in rust-toolchain.toml, so rustup installs it on first use."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "kind": "test",
+        "name": "tests without std",
+        "run": "cargo test --no-default-features",
+        "code": "src/graph.rs"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10add-d13f-759a-9960-e810b026c172",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "text": "The structures build without std (only alloc) and pull in no uuid: std, uuid and serde come with the log and the knowledge model."
+    },
+    {
+      "op": "claim.check",
+      "id": "01a10add-d13f-759a-9960-e810b026c172",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "forbid_import": [
+          "uuid",
+          "serde_json",
+          "std"
+        ]
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10add-d140-72c8-b6d9-84ba2b6cf6b4",
+      "node": "01a10a54-fb7a-755d-acab-991d698066fc",
+      "text": "uuid only with log and knowledge; no default key type",
+      "why": "Graph and Tree defaulted K to uuid::Uuid, which made uuid a dependency of every user. A default that switched with a feature would break a crate as soon as another crate in the build turned the feature on (features unify), so the default is gone and every user names K; Alfred, Tend and the knowledge model already did. uuid is now optional and pulled in by log and knowledge, which use it. This replaces the todo's plan of a default `uuid` feature, which wouldn't have kept uuid off parda's path without default-features = false.",
+      "rests_on": [
+        {
+          "of": "design:sylva / Foundation",
+          "at": "fp:72f4e148160c",
+          "checked": "2026-10-05"
+        },
+        {
+          "of": "design:sylva / Structures",
+          "at": "fp:a256e5b17317",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10add-d140-72c8-b6d9-84bbda23c4c2",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "text": "A default std feature; the structures need only alloc",
+      "why": "lib.rs is no_std without `std`; graph, tree and forest import from alloc and core, and Error's Io variant comes with std. log, knowledge and serde turn std on. Without default features the crate depends on thiserror alone and builds for wasm32-unknown-unknown, pinned in rust-toolchain.toml.",
+      "rests_on": [
+        {
+          "of": "design:sylva / Structures",
+          "at": "fp:a256e5b17317",
+          "checked": "2026-10-05"
+        }
+      ]
+    }
+  ],
+  "at": 1791183673178,
+  "from_draft": "01a10add-c886-776d-b9e1-c5dc5cd5a3ae",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "7158e05",
+    "tend": "tend 0.1.0"
+  }
+}

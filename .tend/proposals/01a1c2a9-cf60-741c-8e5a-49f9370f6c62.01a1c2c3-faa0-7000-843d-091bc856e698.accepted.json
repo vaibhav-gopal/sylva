@@ -1,0 +1,10 @@
+{
+  "id": "01a1c2c3-faa0-7000-843d-091bc856e698",
+  "proposal": "01a1c2a9-cf60-741c-8e5a-49f9370f6c62",
+  "event": {
+    "kind": "accepted",
+    "batch": "01a1c2c3-faa0-775e-9640-fc9aa4ccf225",
+    "by": "user",
+    "at": 1794268986016
+  }
+}

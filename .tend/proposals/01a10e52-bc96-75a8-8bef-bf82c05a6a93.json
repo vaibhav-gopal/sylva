@@ -1,0 +1,36 @@
+{
+  "id": "01a10e52-bc96-75a8-8bef-bf82c05a6a93",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "vg-paradigms answered graft 01a10afb: leaving the exception out of the manifest is deliberate (it only adds permissions; Cargo's license field is SPDX 2.3, which has no AdditionRef-), and LICENSE.md and REUSE.toml state the full grant. Cargo.toml already says what the baseline asks, so nothing changes here.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.status",
+      "id": "01a10afb-557c-7306-ace1-e50007c41b70",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "journal.add",
+      "id": "01a10e52-b716-72e4-95d9-43f10545b80b",
+      "kind": "note",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "title": "The manifest leaves out the GPL exception on purpose",
+      "body": "Cargo.toml says GPL-3.0-only OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0 while LICENSE.md and REUSE.toml grant GPL-3.0-only WITH AdditionRef-Open-Project-Exception-1.0. vg-paradigms (graft 01a10afb) keeps it so: the exception only adds permissions, and Cargo's license field takes SPDX 2.3, which has no AdditionRef- identifiers. Unverified there: whether crates.io refuses the WITH clause; if a publish ever shows it doesn't, the baseline moves every project to the full expression.",
+      "supersedes": null
+    }
+  ],
+  "at": 1791241665686,
+  "from_draft": "01a10e4e-5c9c-7604-a166-c2828e1f5a16",
+  "origin": {
+    "harness": "claude-code 2.1.289",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "7b3a7e8",
+    "tend": "tend 0.1.0"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "01a15bad-4a4c-7000-a234-a097d9d91314",
+  "proposal": "01a15bad-188f-7443-98c4-025ea3eed0c3",
+  "event": {
+    "kind": "withdrawn",
+    "reason": "One claim was wrong: the change log isn't free at 100k (about 4%); refiled with the measured numbers.",
+    "by": "agent:claude-code",
+    "at": 1792539445836
+  }
+}

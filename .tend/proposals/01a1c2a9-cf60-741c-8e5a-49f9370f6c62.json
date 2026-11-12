@@ -1,0 +1,29 @@
+{
+  "id": "01a1c2a9-cf60-741c-8e5a-49f9370f6c62",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "The user decided on 2026-11-09 that sylva isn't open to contributions yet, which keeps its CI off under the baseline's ci.closed rule. Recorded from a hub session.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "claim.add",
+      "id": "01a1c2a9-c7de-7147-bcd1-7e3472db9174",
+      "node": null,
+      "text": "sylva is not open to contributions yet: CI stays off under ci.closed",
+      "why": "The user decided this on 2026-11-09. Though sylva is published (0.1.0) and its repository is public, it doesn't take contributions yet, so the baseline's ci.closed rule holds for it: no workflows and GitHub Actions off, its declared tests and gates run in git hooks before a commit and a push, and checks for other systems (wasm32 builds, other architectures) run on the user's own machines. It opens to contributions, and runs CI under ci.open, only when the user says so."
+    }
+  ],
+  "at": 1794267271008,
+  "from_draft": "01a1c2a9-c69b-77b8-95bd-6ebce7eff39e",
+  "origin": {
+    "harness": "hubcall 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "cba2332",
+    "tend": "tend 0.1.0",
+    "via": "hub"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "id": "01a122bf-edd4-724a-a0b4-0a9fcd526bcf",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "baseline:vg-paradigms",
+  "rationale": "Upgrade to vg-paradigms release 2026.10.2 (CI reads private repos through a deploy key per dependency (pattern, avoid pattern, rule ci.private-deps); a powershell profile; pester and psscriptanalyzer on trial; commit.checks-first only in Rust repos; weft and jacquard re-judged at their milestones): 1 rule change(s), 0 new todo(s)",
+  "why": "documents (the conduct, a baseline's toolbox and rules) are the user's: an agent's change to one is a proposal",
+  "ops": [
+    {
+      "op": "doc.set",
+      "path": "extends.toml",
+      "text": "baseline = \"vg-paradigms\"\nrev = \"1d1f7fc\"\nrelease = \"2026.10.2\"\nprofiles = [\"rust\"]\nmodules = [\"op-log\"]\n\n[license]\ncombo = \"library\"\n"
+    },
+    {
+      "op": "todo.add",
+      "id": "01a122bf-edd2-724c-8134-8189c36d10bb",
+      "title": "Baseline release 2026.10.2: render again (`tend baseline render --write`)",
+      "body": "+ ci.private-deps: CI reads another private repo through a read-only deploy key per dependency (secret <DEP>_DEPLOY_KEY), never a personal access token (toolbox pattern: deploy key per private dependency).",
+      "by": "agent",
+      "refs": [],
+      "waits_on": [],
+      "milestone": null
+    }
+  ],
+  "at": 1791584366035
+}

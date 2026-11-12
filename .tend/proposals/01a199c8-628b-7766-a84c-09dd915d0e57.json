@@ -1,0 +1,25 @@
+{
+  "id": "01a199c8-628b-7766-a84c-09dd915d0e57",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "baseline:vg-paradigms",
+  "rationale": "Upgrade to vg-paradigms release 2026.10.15 (checks.commands: runtime pinned in the language's files, commands as justfile recipes; scaffold justfiles for rust and python), by your auto subscription: 6 rule change(s), 1 new todo(s); its auto subscription proposes it, since it would break 1 thing(s)",
+  "why": "documents (the conduct, what a project builds on, its workflows) are the user's: an agent's change to one is a proposal; in a baseline's project, an agent with `trusted` records the baseline's own documents",
+  "ops": [
+    {
+      "op": "doc.set",
+      "path": "extends.toml",
+      "text": "baseline = \"vg-paradigms\"\nrev = \"e7f7052\"\nrelease = \"2026.10.15\"\nprofiles = [\"rust\"]\nmodules = [\"op-log\"]\n\n[license]\ncombo = \"library\"\n"
+    },
+    {
+      "op": "todo.add",
+      "id": "01a199c8-6287-72ff-8786-a30d4a1d0f9c",
+      "title": "Baseline release 2026.10.15: A project closed to contributions (the default) has no CI: no workflows, and GitHub Actions turned off. Its declared tests and gates run in git hooks (tend's checks and the tests a change reaches before a commit, all of them before a push), and checks for other systems run on your own machines through Nix remote builders. A check no machine here can run is the exception: its workflow stays, with a decision in the journal that waives ci.closed and says why.",
+      "body": "ci.closed (warn, global/rules.toml): .github/workflows/ci.yml exists (forbidden: .github/workflows/*.yml)",
+      "by": "agent",
+      "refs": [],
+      "waits_on": [],
+      "milestone": null
+    }
+  ],
+  "at": 1793581408907
+}

@@ -1,0 +1,725 @@
+{
+  "id": "01a10a4f-5e32-72fd-aa78-8fe6880eb3f6",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "First design of sylva, adopted from what the code already is: three layers (structures, log, knowledge) as in docs/DESIGN.md, each component linked to its code, with the rules, checks and decisions the design document states.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9cc95c56d41",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "text": "Determinism: the same ops give the same state, byte for byte, on every machine; iteration follows key order, never insertion order or slot layout."
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9cda4d666d0",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "text": "Pure Rust; SQLite is the one native dependency, optional and bundled, so the crate builds for desktop, server and iOS."
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9ce740219a7",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "text": "No graph database, query language, general collection library or algorithm catalogue: only the walks and queries Sylva's users need."
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226",
+      "parent": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "name": "Foundation",
+      "kind": "component",
+      "intent": "The Key trait and the Error type every layer shares.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226",
+      "link": {
+        "kind": "path",
+        "value": "src/lib.rs"
+      }
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226",
+      "link": {
+        "kind": "path",
+        "value": "src/error.rs"
+      }
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "parent": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "name": "Structures",
+      "kind": "area",
+      "intent": "General-purpose graphs and trees with stable keys, dense storage and the indexes real queries need, iterating in key order.",
+      "status": "done"
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d12b600b8d",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "text": "Neighbours, degrees and edge-exists checks cost the node's degree, not the graph; walks are iterators that don't allocate per step."
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d20a98e0dd",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "text": "Equality compares content, never storage layout."
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "link": {
+        "kind": "path",
+        "value": "benches/structures.rs"
+      }
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d362272e19",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "name": "Graph",
+      "kind": "component",
+      "intent": "A directed graph generic over node and edge data: adjacency both ways sorted by edge key, walks, shortest paths and topological order.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9d362272e19",
+      "link": {
+        "kind": "path",
+        "value": "src/graph.rs"
+      }
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d45ae6ec23",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "name": "Tree",
+      "kind": "component",
+      "intent": "An ordered forest: lineage, ancestors, pruned subtree and preorder walks, and moves that refuse cycles.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9d45ae6ec23",
+      "link": {
+        "kind": "path",
+        "value": "src/tree.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "kind": "depends_on",
+      "to": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "parent": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "name": "Log",
+      "kind": "area",
+      "intent": "Makes any state remember: changes are ops in batches, state is the replay of the log, branches merge, and any past step can be rebuilt (feature `log`).",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "link": {
+        "kind": "path",
+        "value": "benches/log.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "kind": "depends_on",
+      "to": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d625241c70",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "Batches",
+      "kind": "component",
+      "intent": "Batches with their header, the canonical JSONL form, causal order, projections and a replay that keeps ops that no longer apply as conflicts.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9d625241c70",
+      "link": {
+        "kind": "path",
+        "value": "src/log/mod.rs"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d742c8bf2a",
+      "node": "01a10a4f-5ab1-7400-9299-a9d625241c70",
+      "text": "Replay never fails: an op that doesn't apply becomes a Conflict for a person to resolve."
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d8f2316d62",
+      "node": "01a10a4f-5ab1-7400-9299-a9d625241c70",
+      "text": "Causal order is the same for any set of batches in any input order."
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9d94a546ba6",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "History",
+      "kind": "component",
+      "intent": "Keeps a projection's replayed state current, applying a batch that follows the head alone, with snapshots for time travel.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9d94a546ba6",
+      "link": {
+        "kind": "path",
+        "value": "src/log/history.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9d94a546ba6",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9d625241c70"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9da388de7ae",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "Batch files",
+      "kind": "component",
+      "intent": "One file per batch, so two branches never edit the same file.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9da388de7ae",
+      "link": {
+        "kind": "path",
+        "value": "src/log/files.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9da388de7ae",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9d625241c70"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9dbfb543cd1",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "Hash chain",
+      "kind": "component",
+      "intent": "One writer's ops in sequence, each sealing the previous hash, so any edit to the past is detected.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9dbfb543cd1",
+      "link": {
+        "kind": "path",
+        "value": "src/log/chain.rs"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9dcfb5deb78",
+      "node": "01a10a4f-5ab1-7400-9299-a9dbfb543cd1",
+      "text": "The hash encoding ({seq, id, batch, parent, ts, actor, op} as JSON in that order) is pinned by a test: every existing chain depends on it."
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9dd5b2db6f0",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "Signatures",
+      "kind": "component",
+      "intent": "Ed25519 signatures over a batch's canonical form under a caller-chosen domain, verified against trusted keys (feature `sign`).",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9dd5b2db6f0",
+      "link": {
+        "kind": "path",
+        "value": "src/log/sign.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9dd5b2db6f0",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9d625241c70"
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9dd5b2db6f0",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9da388de7ae"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9def24f9f9e",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "SQLite store",
+      "kind": "component",
+      "intent": "The hash chain stored in SQLite, one row per op, with payloads run through a codec (feature `sqlite`).",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9def24f9f9e",
+      "link": {
+        "kind": "path",
+        "value": "src/log/sqlite.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9def24f9f9e",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9dbfb543cd1"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9df21aab3fa",
+      "parent": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "name": "Encryption at rest",
+      "kind": "component",
+      "intent": "A codec that seals each stored op with XChaCha20-Poly1305 under a data key derived per application from one master key (feature `crypt`).",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9df21aab3fa",
+      "link": {
+        "kind": "path",
+        "value": "src/log/crypt.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9df21aab3fa",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9def24f9f9e"
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e0210f6262",
+      "node": "01a10a4f-5ab1-7400-9299-a9df21aab3fa",
+      "text": "The stored format (`e1:` + base64(nonce || ciphertext), the op's hash as associated data) is Alfred's byte for byte; rows without the prefix read as plain JSON."
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "parent": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "name": "Knowledge",
+      "kind": "area",
+      "intent": "A typed property graph and a catalog tree built from ops on the structures: schemas, stated vs observed facts, references, queries and diagrams (feature `knowledge`), with TypeScript types generated by ts-rs (feature `ts`) that match its written-out JSON.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "link": {
+        "kind": "path",
+        "value": "src/knowledge/mod.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "kind": "depends_on",
+      "to": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc"
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "kind": "depends_on",
+      "to": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226"
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e285c1f823",
+      "node": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "text": "Op JSON is stored data (Alfred's log and every repo's .tend/log): field names, tags and enum spellings change only with a migration."
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e396940ef4",
+      "node": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "text": "An op that would change nothing is rejected."
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e459ed4791",
+      "parent": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "name": "References",
+      "kind": "component",
+      "intent": "References to entities owned elsewhere (`domain/kind/id`, `files:path`, a host's `scheme:path`), validated in shape.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9e459ed4791",
+      "link": {
+        "kind": "path",
+        "value": "src/knowledge/refs.rs"
+      }
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e58aaf58c6",
+      "parent": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "name": "Attributes",
+      "kind": "component",
+      "intent": "Typed attribute definitions and the check of a value against one.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9e58aaf58c6",
+      "link": {
+        "kind": "path",
+        "value": "src/knowledge/attrs.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e58aaf58c6",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9e459ed4791"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e6478bf3e5",
+      "parent": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "name": "Catalog trees",
+      "kind": "component",
+      "intent": "Catalog trees whose nodes are retired, split, merged and restored rather than deleted, with attributes their descendants inherit.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9e6478bf3e5",
+      "link": {
+        "kind": "path",
+        "value": "src/knowledge/trees.rs"
+      }
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e6478bf3e5",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9d45ae6ec23"
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e6478bf3e5",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9e58aaf58c6"
+    },
+    {
+      "op": "node.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e7fb8541f2",
+      "parent": "01a10a4f-5ab1-7400-9299-a9e105b613bd",
+      "name": "Property graphs",
+      "kind": "component",
+      "intent": "Property graphs with schemas and facts that record where they came from, plus queries, a name-based change language and Mermaid, DOT and D2 rendering.",
+      "status": "done"
+    },
+    {
+      "op": "node.code.link",
+      "node": "01a10a4f-5ab1-7400-9299-a9e7fb8541f2",
+      "link": {
+        "kind": "path",
+        "value": "src/knowledge/graphs/*"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab1-7400-9299-a9e800d1c05a",
+      "node": "01a10a4f-5ab1-7400-9299-a9e7fb8541f2",
+      "text": "An observation never overwrites or removes what was stated."
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e7fb8541f2",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9d362272e19"
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e7fb8541f2",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9e58aaf58c6"
+    },
+    {
+      "op": "node.relate",
+      "from": "01a10a4f-5ab1-7400-9299-a9e7fb8541f2",
+      "kind": "uses",
+      "to": "01a10a4f-5ab1-7400-9299-a9e459ed4791"
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "test",
+        "name": "unit tests",
+        "run": "cargo test --all-features",
+        "code": "src/**/*.rs",
+        "notes": "Unit tests live next to each module."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "test",
+        "name": "clippy",
+        "run": "cargo clippy --all-features --all-targets -- -D warnings"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "check": {
+        "kind": "bench",
+        "name": "structures",
+        "run": "cargo bench --bench structures",
+        "code": "benches/structures.rs"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+      "check": {
+        "kind": "bench",
+        "name": "log",
+        "run": "cargo bench --all-features --bench log",
+        "code": "benches/log.rs"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b3256101a7b3",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "text": "One crate with features, not five",
+      "why": "Splits only pay where consumers need different dependencies; features handle that.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b326ffb5222a",
+      "node": "01a10a4f-5ab1-7400-9299-a9dd5b2db6f0",
+      "text": "No separate signing crate",
+      "why": "Signing is a property of batches; key custody belongs to the application.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b3271cddd0a5",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "text": "Ordered BTreeMap index, not a hash map",
+      "why": "Deterministic iteration with no extra sorting, and no hasher dependency.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b3282a112452",
+      "node": "01a10a4f-5ab1-7400-9299-a9d362272e19",
+      "text": "Adjacency sorted by edge key",
+      "why": "Same order as a scan of all edges by key, so results didn't change when the scan went away.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32977429487",
+      "node": "01a10a4f-5ab1-7400-9299-a9d625241c70",
+      "text": "Conflicts as data, not errors",
+      "why": "Merged histories must always replay; people resolve what doesn't apply.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32a41b7ad3c",
+      "node": "01a10a4f-5ab1-7400-9299-a9dd5b2db6f0",
+      "text": "The caller picks the signature domain",
+      "why": "One key can't be tricked into signing for another purpose. Tend's domain stays `alfred-tend-batch-v1\\n` so existing signatures remain valid.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32b65ff817a",
+      "node": "01a10a4f-5ab1-7400-9299-a9df21aab3fa",
+      "text": "Encryption keys derived per application",
+      "why": "One master key can serve several apps (HMAC-SHA256 of `<app>/v1/data`) without any two sharing a data key.",
+      "rests_on": [
+        {
+          "of": "doc:design/8. Decisions",
+          "at": "fp:26cad878d474",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32cc7a6bb44",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "text": "Extracted from Alfred",
+      "why": "Sylva was extracted from Alfred so Alfred and Tend build on one implementation; its bar is Alfred's benchmark baseline (alfred/docs/benchmarks/baseline.md), checked by benchmarks rather than assumed.",
+      "rests_on": [
+        {
+          "of": "doc:design/1. Goals and non-goals",
+          "at": "fp:5ffc7abd5246",
+          "checked": "2026-10-05"
+        }
+      ]
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32dc11f1a3e",
+      "title": "Move Alfred's store onto crypt and drop its own copy of the cipher",
+      "body": null,
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a4f-5ab1-7400-9299-a9df21aab3fa"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32ee377836d",
+      "title": "Serde for the generic Graph and Tree, for users without the knowledge model",
+      "body": null,
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a4f-5ab1-7400-9299-a9d0451ab1bc"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a4f-5ab2-7523-9906-b32fe1265ae5",
+      "title": "Persisted snapshots for long histories",
+      "body": null,
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a4f-5ab1-7400-9299-a9d94a546ba6"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a4f-5ab2-7523-9906-b330a0009a6c",
+      "title": "A reverse-relation index pattern for projections that ask what points at this",
+      "body": null,
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a4f-5ab1-7400-9299-a9d5c8941fbe"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b3312bf7516b",
+      "node": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226",
+      "text": "Foundation doesn't use Structures, Log or Knowledge: they build on it."
+    },
+    {
+      "op": "claim.check",
+      "id": "01a10a4f-5ab2-7523-9906-b3312bf7516b",
+      "node": "01a10a4f-5ab1-7400-9299-a9cfb8dfe226",
+      "check": {
+        "forbid_use": [
+          "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+          "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+          "01a10a4f-5ab1-7400-9299-a9e105b613bd"
+        ]
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a10a4f-5ab2-7523-9906-b332389c43fb",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "text": "Structures don't use Log or Knowledge, and pull in no serialization: they stay general-purpose."
+    },
+    {
+      "op": "claim.check",
+      "id": "01a10a4f-5ab2-7523-9906-b332389c43fb",
+      "node": "01a10a4f-5ab1-7400-9299-a9d0451ab1bc",
+      "check": {
+        "forbid_use": [
+          "01a10a4f-5ab1-7400-9299-a9d5c8941fbe",
+          "01a10a4f-5ab1-7400-9299-a9e105b613bd"
+        ],
+        "forbid_import": [
+          "serde_json"
+        ]
+      }
+    }
+  ],
+  "at": 1791174336050,
+  "from_draft": "01a10a4f-538c-734e-84a7-b5a1291a8464",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "2797dd2",
+    "tend": "tend 0.1.0"
+  }
+}

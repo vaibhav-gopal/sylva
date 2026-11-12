@@ -1,0 +1,10 @@
+{
+  "id": "01a10a55-4e21-7000-87c0-c19a79b3fc55",
+  "proposal": "01a10a4f-5e32-72fd-aa78-8fe6880eb3f6",
+  "event": {
+    "kind": "withdrawn",
+    "reason": "Superseded by 01a10a55-0008: the same first design with two Structures rules worded as the code and DESIGN.md intend.",
+    "by": "agent:claude-code",
+    "at": 1791174725153
+  }
+}

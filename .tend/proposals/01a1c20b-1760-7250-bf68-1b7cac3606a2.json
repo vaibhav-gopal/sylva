@@ -1,0 +1,37 @@
+{
+  "id": "01a1c20b-1760-7250-bf68-1b7cac3606a2",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "vg-paradigms asked (graft 01a19343, superseded 2026-10-31 by the rule that closed projects run no CI) for sylva's workflows to go and what only CI ran to move into the checks before a commit or push. The baseline's ci.closed todos carry removing the workflow; this names the checks that must not be lost with it.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.add",
+      "id": "01a1c20b-1440-74d1-beaf-13e982f26895",
+      "title": "Remove .github/workflows (ci.yml, deny.yml) and declare what only CI ran as sylva's own checks",
+      "body": "Rule ci.closed (baseline 2026.10.12 onward, the open todos ask it): sylva is closed to contributions, so it has no workflows. Before deleting ci.yml and deny.yml, declare as tend tests or gates what only CI ran: the no_std build for wasm32 (`--no-default-features --target wasm32-unknown-unknown`, the target pinned in rust-toolchain.toml), each feature set, and the rest of ci.yml, beside the rust profile's checks (fmt, clippy, test, cargo deny), so they run in git hooks before a commit and a push. Check with a deliberately failing check as the control. Whether sylva opens to contributions (it's public and on crates.io) is the user's call; CI comes back with it.",
+      "by": "agent",
+      "refs": [
+        "graft:01a19343-7ac2-7268-8fee-9799a2e35db4",
+        "tend/todo/01a19cf5-f045-763c-8d11-866d1a38aef4",
+        "code:sylva/.github/workflows/ci.yml",
+        "claim:01a10a5e-f376-715b-802a-c921f616a6e3"
+      ],
+      "waits_on": [],
+      "milestone": null
+    }
+  ],
+  "at": 1794256869216,
+  "from_draft": "01a1c20b-1348-74d9-afc8-7b76970bdcaa",
+  "origin": {
+    "harness": "hubcall 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "ed75207",
+    "tend": "tend 0.1.0",
+    "via": "hub"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "01a10ac4-5294-73bc-ab8d-4b78bc2cc7da",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "Forest::to_tree exports to Tree, so Forest uses Tree.",
+  "why": "it builds on 1 change(s) still waiting, so it waits with them",
+  "ops": [
+    {
+      "op": "node.relate",
+      "from": "01a10a5e-f376-715b-802a-c91d4c72e4e8",
+      "kind": "uses",
+      "to": "01a10a54-fb7a-755d-acab-9922f8ebcfae"
+    }
+  ],
+  "at": 1791182000788,
+  "after": [
+    "01a10ac4-251f-77e8-b79c-2beb99c92172"
+  ],
+  "from_draft": "01a10ac4-46f5-7457-aaa7-5940e25093da",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "cd36a13",
+    "tend": "tend 0.1.0"
+  }
+}

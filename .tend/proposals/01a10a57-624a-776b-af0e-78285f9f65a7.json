@@ -1,0 +1,75 @@
+{
+  "id": "01a10a57-624a-776b-af0e-78285f9f65a7",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "Top findings of the first code review (scored 60-75 by a fresh scorer; none reached the 80 cut, so they're todos, not defects on record).",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.add",
+      "id": "01a10a57-5b6d-70db-b641-d3e85723a2c4",
+      "title": "Make catalog-tree Split and Merge atomic",
+      "body": "Split (trees.rs ~396) adds the parts one by one with `?` before retiring the original; Merge (~419) adds the target, then moves children one at a time. A failure partway (two parts named alike, a sibling-name clash between merged nodes' children, a Leaf target with children) returns Err with the tree already changed, and log::apply_batch keeps the half-applied state beside the Conflict. Validate everything first, or apply to a copy. Add tests for each failure.",
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a54-fb7a-755d-acab-9934fcaba167",
+        "code:sylva/src/knowledge/trees.rs"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a57-5b6d-70db-b641-d3e90f1f7333",
+      "title": "Graph create: check the name against names only, not id prefixes",
+      "body": "Graphs::find (graphs/mod.rs ~721) falls back to an id-prefix match, and GraphOp::Create (~500) uses it for its 'already named' check, so a new graph named e.g. \"beef\" or \"0\" is rejected when some UUID starts that way. Update (~509) compares names only, so the two disagree.",
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a54-fb7a-755d-acab-99357d892a66",
+        "code:sylva/src/knowledge/graphs/mod.rs"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a57-5b6d-70db-b641-d3ea605401e9",
+      "title": "An observer's NodeRemove/EdgeRemove must not remove stated props",
+      "body": "NodeRemove (graphs/mod.rs ~628) and EdgeRemove (~711) check only the node's or edge's own source. An observed node can carry stated props (set_prop lets them land), and a scanner's remove then deletes them, against the rule 'An observation never overwrites or removes what was stated.' Refuse the removal when any prop is stated.",
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a54-fb7a-755d-acab-99357d892a66",
+        "code:sylva/src/knowledge/graphs/mod.rs"
+      ],
+      "waits_on": [],
+      "milestone": null
+    },
+    {
+      "op": "todo.add",
+      "id": "01a10a57-5b6d-70db-b641-d3eb817ff6c9",
+      "title": "Graph walk and shortest_path: cost what they reach, not the graph",
+      "body": "walk (graph.rs ~398) and shortest_path (~440) allocate `vec![_; self.nodes.len()]` per call, so a depth-1 neighbours query (knowledge query::neighbors, render's focus view) costs the whole graph. DESIGN.md 3.2 says O(nodes reached + their edges). Track seen slots sparsely (a small set or a reusable buffer), or correct the documented cost.",
+      "by": "agent",
+      "refs": [
+        "tend/node/01a10a54-fb7a-755d-acab-9921facb4c3b",
+        "code:sylva/src/graph.rs",
+        "doc:design/3. Structures"
+      ],
+      "waits_on": [],
+      "milestone": null
+    }
+  ],
+  "at": 1791174861386,
+  "from_draft": "01a10a57-5548-7599-ba4a-079e25af27ef",
+  "origin": {
+    "model": "claude-opus-5-5",
+    "harness": "claude-code 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "9d2a15d",
+    "tend": "tend 0.1.0"
+  }
+}

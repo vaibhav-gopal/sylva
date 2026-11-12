@@ -1,0 +1,41 @@
+{
+  "id": "01a15b6b-b561-72c7-a0d0-2e62dbc48f7b",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "Error is #[non_exhaustive] now that tend (5514297) and alfred have a catch-all arm in From<sylva::Error> (grafts 01a10e58-442a and 01a10e58-4445): features only add again (rust.features-additive).",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.status",
+      "id": "01a10e56-4708-75c3-9da3-fd4a91bed3ed",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "claim.add",
+      "id": "01a15b6b-ab00-7421-b61d-5c8b7c4b8000",
+      "node": "01a10a54-fb7a-755d-acab-991d698066fc",
+      "text": "Error is non-exhaustive",
+      "why": "Features add Error variants (Json with log or knowledge, Io with std, Db with sqlite), and features unify across a build, so an exhaustive match in one crate broke when another crate turned a feature on, against rust.features-additive. With #[non_exhaustive], a match outside sylva needs a catch-all arm; tend and alfred added theirs first (grafts 01a10e58-442a, 01a10e58-4445) and both build against it. Their #[allow(unreachable_patterns)] on that arm is no longer needed.",
+      "rests_on": [
+        {
+          "of": "design:sylva / Foundation",
+          "at": "fp:72f4e148160c",
+          "checked": "2026-10-20"
+        }
+      ]
+    }
+  ],
+  "at": 1792535147873,
+  "from_draft": "01a15b51-0d99-7278-a0f3-21832b38233b",
+  "origin": {
+    "harness": "claude-code 2.1.305",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "2043e21",
+    "tend": "tend 0.1.0"
+  }
+}

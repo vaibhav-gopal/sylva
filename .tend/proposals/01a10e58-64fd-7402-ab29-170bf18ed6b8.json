@@ -1,0 +1,56 @@
+{
+  "id": "01a10e58-64fd-7402-ab29-170bf18ed6b8",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "The Error #[non_exhaustive] todo waits on tend and alfred adding a catch-all arm (grafts 01a10e58-442a and 01a10e58-4445).",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "plan.wait",
+      "item": "01a10e56-4708-75c3-9da3-fd4a91bed3ed",
+      "wait": {
+        "on": "graft:01a10e58-442a"
+      },
+      "remove": false
+    },
+    {
+      "op": "plan.wait",
+      "item": "01a10e56-4708-75c3-9da3-fd4a91bed3ed",
+      "wait": {
+        "on": "graft:01a10e58-4445"
+      },
+      "remove": false
+    },
+    {
+      "op": "todo.status",
+      "id": "01a10e56-4708-75c3-9da3-fd49be251e08",
+      "status": "done",
+      "reason": null
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "gate",
+        "name": "ci on GitHub",
+        "run": "gh run list --workflow ci --limit 1",
+        "of": "unit tests",
+        "condition": "pass",
+        "level": "warn",
+        "notes": ".github/workflows/ci.yml: clippy and tests under all, default and no default features, and the wasm32 build without std."
+      }
+    }
+  ],
+  "at": 1791242036477,
+  "from_draft": "01a10e4e-5c9c-7604-a166-c2828e1f5a16",
+  "origin": {
+    "harness": "claude-code 2.1.289",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "00978b2",
+    "tend": "tend 0.1.0"
+  }
+}

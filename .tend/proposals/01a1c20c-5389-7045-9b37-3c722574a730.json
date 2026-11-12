@@ -1,0 +1,33 @@
+{
+  "id": "01a1c20c-5389-7045-9b37-3c722574a730",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:claude-code",
+  "agent": "01a0f61b-3e85-75a4-852f-0db7d9173b98",
+  "rationale": "News reviewed: 1 item(s)",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "todo.add",
+      "id": "01a1c20c-5388-7692-9c42-e7f0ce8d809a",
+      "title": "Render the baseline's licensing changes (LICENSE.md, LICENSES/, REUSE.toml) at the release sylva takes next, and check the manifest's license expression against combos.toml",
+      "body": "sylva takes the library combo; the baseline changed its LICENSE.md template, the license texts, combos.toml, the commercial agreement and contributing.md, so sylva's rendered license files are out of date until it renders again (its open 2026.10.x license todos predate these changes).",
+      "by": "agent",
+      "refs": [
+        "doc:licensing/LICENSE.md.tmpl"
+      ],
+      "waits_on": [],
+      "milestone": null
+    }
+  ],
+  "at": 1794256950153,
+  "origin": {
+    "harness": "hubcall 1",
+    "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+    "machine": "VGHYDRA",
+    "repo": "C:/vg-workspace/projects/sylva",
+    "branch": "main",
+    "commit": "ed75207",
+    "tend": "tend 0.1.0",
+    "via": "hub"
+  }
+}
