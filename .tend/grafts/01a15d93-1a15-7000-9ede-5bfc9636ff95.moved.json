@@ -1,0 +1,45 @@
+{
+  "id": "01a15d93-1a15-7000-9ede-5bfc9636ff95",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "event": {
+    "kind": "op",
+    "op": {
+      "type": "graft.restore",
+      "graft": {
+        "id": "01a15c96-a9a5-7016-851b-407c05633877",
+        "from": {
+          "who": "agent:claude-code",
+          "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702"
+        },
+        "to": "01a10430-904c-72df-bba3-5012964f3c60",
+        "kind": "fix",
+        "title": "Accepting a proposal records a read of claim:<id> that sylva's replay can't find",
+        "need": "Since rules and decisions became claims (claim:01a15b21-254e), accepting a proposal in sylva writes a `review` op naming `claim:<id>` for each decision in it, but sylva's history holds those decisions as journal entries (journal:<id>), so replay records a conflict and design_review reports `sound: false`. Five batches so far, all titled \"read N item(s), as accepted (proposal …)\": 01a15b5c-6929..83dd, 01a15b6b-cb27..983d, 01a15b7b-11d0..c9bb, 01a15b9f-a1cc..6fcb, 01a15c35-c590..053f. Example, .tend/log/01a15c35-c590-779d-921e-0b77c446053f.jsonl: {\"op\":\"review\",\"items\":[{\"of\":\"claim:01a15bad-4d7a-76ee-a95e-4d7c19685c96\",…},{\"of\":\"journal:01a15bad-4d7c-7118-b66d-f98a0f593288\",…}]}: the decision 01a15bad-4d7a (journal, kind decision) is reviewed as a claim, the note beside it as journal, and only the claim fails (\"not found: claim:01a15bad-4d7a…\"). Either the review should name what the repo holds (journal:<id> for a decision not migrated), or the repo's decisions should be migrated to claims so the address resolves; and the five recorded conflicts should clear (the reads they meant to record happened).",
+        "use_case": "sylva's design should verify clean (design_review sound, `tend check --strict` usable in CI), and what the user has read should count as read, so the reviewed/unreviewed provenance stays true.",
+        "refs": [
+          "design:sylva"
+        ],
+        "at": 1792554740133,
+        "status": "done",
+        "answer": {
+          "text": "With the tend deployed now (e4f1f35), sylva's history replays clean: design_review in sylva says no conflicts and sound: true. A decision written as a journal op replays as the claim its read names (claim:<id>), so the five reads resolve and count as read; the conflicts came from the older tend the session ran. A test pins it (tend-core review: a decision written as a journal entry, read as its claim). Restart sylva's session to run the current tend; nothing in sylva's history needs changing.",
+          "node": "Tend / Core / Provenance and review",
+          "by": {
+            "who": "agent:claude-code",
+            "project": "01a10430-904c-72df-bba3-5012964f3c60"
+          },
+          "at": 1792571283989
+        },
+        "origin": {
+          "harness": "claude-code 2.1.305",
+          "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+          "machine": "VGHYDRA",
+          "repo": "C:/vg-workspace/projects/sylva",
+          "branch": "main",
+          "commit": "81b5c4b",
+          "tend": "tend 0.1.0"
+        }
+      }
+    }
+  }
+}

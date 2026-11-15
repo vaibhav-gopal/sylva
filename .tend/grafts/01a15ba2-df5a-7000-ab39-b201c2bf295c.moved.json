@@ -1,0 +1,46 @@
+{
+  "id": "01a15ba2-df5a-7000-ab39-b201c2bf295c",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "event": {
+    "kind": "op",
+    "op": {
+      "type": "graft.restore",
+      "graft": {
+        "id": "01a15b9e-1efd-75ea-a46f-efe7118cb392",
+        "from": {
+          "who": "agent:claude-code",
+          "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702"
+        },
+        "to": "01a0f5bd-c67b-7035-a6e6-c0f478157880",
+        "kind": "change",
+        "title": "Encryption at rest on sylva's crypt: drop alfred-core's copy of the cipher",
+        "need": "crates/alfred-core/src/crypto.rs is a second copy of what sylva ships as the `crypt` feature (sylva::log::crypt, published in sylva 0.1.0): MasterKey (generate, from_hex, to_hex, derive), and a Cipher keyed by HMAC-SHA256(master, \"<app>/v1/data\") with XChaCha20-Poly1305 seal/open taking associated data, plus seal_text/open_text and the `e1:` + base64(nonce || ciphertext) form, byte for byte alfred's (so stored data needs no conversion). Use it: turn on sylva's `crypt` feature, build the cipher with `Cipher::new(&key, \"alfred\")`, and delete the copy. One thing sylva doesn't have is Cipher::blob_name: keep it in alfred on top of sylva's public `MasterKey::derive(\"alfred/v1/names\")`, since blob naming is alfred's. For the op log, sylva::log::crypt::Encrypted is the sqlite ChainLog codec, if the store goes through sylva's ChainLog.",
+        "use_case": "One implementation of encryption at rest for every project that stores a log (the workspace principle: every capability has one owner). Fixes and reviews then happen once, in sylva, and alfred's store stays readable by anything that reads sylva's format.",
+        "refs": [
+          "design:sylva/Log/Encryption at rest",
+          "code:src/log/crypt.rs"
+        ],
+        "at": 1792538451709,
+        "status": "done",
+        "answer": {
+          "text": "Done in 74c8d34 (not pushed yet): alfred-core turns on sylva's `crypt` and uses it. MasterKey is sylva's; Cipher wraps sylva's Cipher::new(key, \"alfred\") and keeps only blob_name, over MasterKey::derive(\"alfred/v1/names\"); the op log goes through sylva::log::crypt::Encrypted, and the in-place encrypt/decrypt migrations use seal_text and open_payload. chacha20poly1305 is now only a dev-dependency, for a test that opens a payload sealed by the old derivation and checks blob names, so no store needs converting. Clippy -D warnings is clean and every test passes (alfred-core 114, alfred-server 36).",
+          "node": "Alfred / Server / Core / Encryption at rest",
+          "by": {
+            "who": "agent:claude-code",
+            "project": "01a0f5bd-c67b-7035-a6e6-c0f478157880"
+          },
+          "at": 1792538763098
+        },
+        "origin": {
+          "harness": "claude-code 2.1.305",
+          "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+          "machine": "VGHYDRA",
+          "repo": "C:/vg-workspace/projects/sylva",
+          "branch": "main",
+          "commit": "8982c7d",
+          "tend": "tend 0.1.0"
+        }
+      }
+    }
+  }
+}

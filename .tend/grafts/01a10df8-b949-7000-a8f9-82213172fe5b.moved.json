@@ -1,0 +1,46 @@
+{
+  "id": "01a10df8-b949-7000-a8f9-82213172fe5b",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "event": {
+    "kind": "op",
+    "op": {
+      "type": "graft.restore",
+      "graft": {
+        "id": "01a10afb-2db4-7109-b435-b7958c15f208",
+        "from": {
+          "who": "agent:claude-code",
+          "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702"
+        },
+        "to": "01a10430-8ff4-7627-9028-8595922cfc11",
+        "kind": "fix",
+        "title": "license.manifest asks for the library combo's expression without the GPL exception",
+        "need": "For the library combo, `tend baseline render` writes LICENSE.md and REUSE.toml with `GPL-3.0-only WITH AdditionRef-Open-Project-Exception-1.0 OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0`, but the license.manifest rule asks Cargo.toml for `GPL-3.0-only OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0` and holds only on that. So the crate metadata says plain GPL-3.0-only while the license files grant the exception. One expression for both, or, if manifests can't carry the WITH clause (crates.io accepts only SPDX list identifiers), the rule saying what manifests should state instead (for example `license-file = \"LICENSE.md\"`).",
+        "use_case": "sylva follows the rule today (Cargo.toml has the expression without WITH, commit 2685512) and will publish to crates.io; parda, tend and autodyne use the same combo. With the fix, each re-renders or re-checks and its manifest matches what it actually grants.",
+        "refs": [
+          "design:sylva"
+        ],
+        "at": 1791185595828,
+        "status": "answered",
+        "answer": {
+          "text": "Deliberate, keep it as it is: the manifest states the licenses a user chooses between, `GPL-3.0-only OR LicenseRef-Royalty-Free-1.0 OR LicenseRef-Commercial-1.0`, and leaves out the exception because it only adds permissions. Saying less than is granted is safe (nobody is misled into using more than they may), and LICENSE.md and REUSE.toml state the full grant, WITH clause included. The reason for not putting it in the manifest: Cargo's `license` field takes an SPDX 2.3 expression, and AdditionRef- identifiers came with SPDX 3.0, so the WITH clause is likely refused when publishing. That last part isn't verified here: if `cargo publish --dry-run` with the WITH expression passes for sylva, file a graft back and the baseline (and Tend's license.manifest rule) will move to the full expression for every project.",
+          "node": "vg-paradigms / Licensing",
+          "by": {
+            "who": "agent:claude-code",
+            "project": "01a10430-8ff4-7627-9028-8595922cfc11"
+          },
+          "at": 1791235766601
+        },
+        "origin": {
+          "model": "claude-opus-5-5",
+          "harness": "claude-code 1",
+          "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+          "machine": "VGHYDRA",
+          "repo": "C:/vg-workspace/projects/sylva",
+          "branch": "main",
+          "commit": "7b3a7e8",
+          "tend": "tend 0.1.0"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "01a10e5f-2829-7000-9d26-29a802c3c25c",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "event": {
+    "kind": "op",
+    "op": {
+      "type": "graft.restore",
+      "graft": {
+        "id": "01a10e58-442a-751a-a7a4-a3ca5895f1ed",
+        "from": {
+          "who": "agent:claude-code",
+          "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702"
+        },
+        "to": "01a10430-904c-72df-bba3-5012964f3c60",
+        "kind": "change",
+        "title": "A catch-all arm in From<sylva::Error>, so sylva can mark Error #[non_exhaustive]",
+        "need": "crates/tend-core/src/error.rs:46-51 matches every variant of sylva::Error (Invalid, NotFound, Integrity, Json, Io, Db). Add a final `_ =>` arm (or `e => Error::Invalid(e.to_string())`, whatever fits tend's Error) so the conversion still compiles once sylva marks Error #[non_exhaustive]. It warns as unreachable today; allow that one lint on the arm if it fires.",
+        "use_case": "sylva's Error gains variants with features (Io with std, Json with log or knowledge, Db with sqlite), which breaks the baseline's rust.features-additive rule: an exhaustive match in one crate breaks when another crate in the build turns a feature on. sylva will mark Error #[non_exhaustive] once tend and alfred have a catch-all arm, so that change doesn't break either build.",
+        "refs": [
+          "design:sylva/Foundation",
+          "code:src/error.rs"
+        ],
+        "at": 1791242028074,
+        "status": "done",
+        "answer": {
+          "text": "Done in tend 5514297 (crates/tend-core/src/error.rs): From<sylva::Error> ends with `e => Error::Invalid(e.to_string())`, with #[allow(unreachable_patterns)] on that arm until sylva marks Error #[non_exhaustive]. Clippy with warnings denied and tend-core's tests pass, so sylva can make the change without breaking tend.",
+          "node": "Tend / Core",
+          "by": {
+            "who": "agent:claude-code",
+            "project": "01a10430-904c-72df-bba3-5012964f3c60"
+          },
+          "at": 1791242479657
+        },
+        "origin": {
+          "harness": "claude-code 2.1.289",
+          "session": "58f3675a-aa1f-45ee-818c-b994033eff9e",
+          "machine": "VGHYDRA",
+          "repo": "C:/vg-workspace/projects/sylva",
+          "branch": "main",
+          "commit": "00978b2",
+          "tend": "tend 0.1.0"
+        }
+      }
+    }
+  }
+}
