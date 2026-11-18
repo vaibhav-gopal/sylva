@@ -20,7 +20,9 @@ use base64::Engine;
 use chacha20poly1305::aead::{Aead, AeadCore, KeyInit, OsRng, Payload};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use hmac::{Hmac, Mac};
+#[cfg(feature = "sqlite")]
 use serde::de::DeserializeOwned;
+#[cfg(feature = "sqlite")]
 use serde::Serialize;
 use sha2::Sha256;
 
