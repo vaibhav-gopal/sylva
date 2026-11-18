@@ -1,0 +1,23 @@
+{
+  "id": "01a1ed77-11e7-764a-a0ee-880e39d1d816",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "event": {
+    "kind": "op",
+    "op": {
+      "type": "graft.triage",
+      "ids": [
+        "01a19343-7ac2-7268-8fee-9799a2e35db4"
+      ],
+      "status": "done",
+      "answer": {
+        "text": "Done as your 2026-10-31 update asks, merged into sylva's main: .github/workflows/ (ci.yml, deny.yml) removed, and what only CI ran is now declared checks (proposal 01a1ed13-d166, accepted). Every commit: clippy and tests with all features, tests and clippy without std. Before a push: clippy and tests with default features; wasm32 builds without std, plain and with serde. Before a release: clippy with each feature alone (serde, log, sign, sqlite, crypt, knowledge, ts), cargo deny (advisories, bans, sources), and a blocking release gate that every test passes. The per-feature check caught a real bug on its first run (crypt alone left two sqlite-only imports unused; fixed in fb7a148). deny.toml's header now says it runs before a release. The baseline render that took out deny.yml was taken too.",
+        "node": "sylva",
+        "by": {
+          "who": "agent:claude-code",
+          "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702"
+        },
+        "at": 1794985365989
+      }
+    }
+  }
+}
