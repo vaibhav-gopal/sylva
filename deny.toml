@@ -1,4 +1,4 @@
-# cargo-deny policy: `cargo deny --workspace check advisories bans sources` (CI: .github/workflows/deny.yml).
+# cargo-deny policy: `cargo deny --workspace check advisories bans sources`, run before a release (sylva's declared deny check).
 #
 # Licenses are not checked here: the project is licensed under a combo of the vg-paradigms baseline
 # (.tend/extends.toml), and `tend check` judges every shipping dependency's license against what that

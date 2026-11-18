@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Answer what other projects have asked of this one (Tend grafts) - all of them together, grouped by need so one design serves every asker, answered with the node or todo that carries it, or declined with why. Use when the session context or graft_list shows open grafts, or when asked to go through requests from other projects.
+description: Answer what other projects have asked of this one (tend grafts) - all of them together, grouped by need so one design serves every asker, answered with the node or todo that carries it, or declined with why. Use when the session context or graft_list shows open grafts, or when asked to go through requests from other projects.
 ---
 
 # Triage grafts
@@ -14,8 +14,10 @@ description: Answer what other projects have asked of this one (Tend grafts) - a
      specific asks.
 3. Answer with `graft_triage`, several ids at once when one design serves them:
    - `planned` or `done`, naming what carries it: `node`, or `item` (a todo here). Add it first if it
-     doesn't exist, with `design_propose`: a node, or a todo whose `refs` name the grafts.
+     doesn't exist, with `design_propose`: a node, or a todo whose `refs` name the grafts. A todo still
+     waiting in a proposal answers too: the answer is held with it until the user accepts it.
    - `declined`, saying why (the askers see it).
    - `answered`, for a question.
 4. Anything you can't decide (it changes the design's direction, or it conflicts with a decision): leave
-   it open and tell the user.
+   it open and tell the user, with what would decide it beside it: `tend_basis` with the claim as
+   `address` and the graft as `against`. Show both sides as they come; don't pick one.
