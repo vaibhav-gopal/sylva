@@ -1,0 +1,197 @@
+{
+  "id": "01a1ed13-d166-72b6-92ac-5915ce628d8c",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:hub-worker",
+  "agent": "01a1d19f-fa21-7026-b108-1b85e68175e5",
+  "rationale": "Graft 01a19343-7ac2 (vg-paradigms), as its 2026-10-31 update supersedes it: sylva is closed to contributions (ci.closed), so .github/workflows/ goes and what only CI ran becomes declared checks that tend's hooks run before a commit, a push or a release.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "node.check.remove",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "kind": "gate",
+      "name": "ci on GitHub"
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "test",
+        "name": "clippy, default features",
+        "run": "cargo clippy --all-targets -- -D warnings",
+        "on": "push",
+        "notes": "Default features are `std` alone, so this is also the std-alone check. Was ci.yml's matrix row \"\"."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "test",
+        "name": "tests, default features",
+        "run": "cargo test",
+        "on": "push",
+        "notes": "Was ci.yml's matrix row \"\"."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "test",
+        "name": "cargo deny",
+        "run": "cargo deny --workspace check advisories bans sources",
+        "on": "release",
+        "notes": "RustSec advisories, banned crates and sources, per deny.toml (licenses are tend check's). Was .github/workflows/deny.yml. cargo-deny isn't installed on vghydra (2026-11-18); by the machine policy it comes through vg-dotfiles-windows, never by hand."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "check": {
+        "kind": "gate",
+        "name": "release",
+        "of": "*",
+        "condition": "pass",
+        "level": "block",
+        "on": "release",
+        "notes": "A release (a version tag, a crates.io publish) waits on every test below passing, the release-only ones included: each feature alone, the wasm32 builds and cargo deny."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "kind": "test",
+        "name": "clippy without std",
+        "run": "cargo clippy --no-default-features --all-targets -- -D warnings",
+        "code": "src/*.rs",
+        "notes": "Was ci.yml's matrix row --no-default-features (with `tests without std`)."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "kind": "test",
+        "name": "wasm32 without std",
+        "run": "cargo build --no-default-features --target wasm32-unknown-unknown",
+        "code": "src/*.rs",
+        "on": "push",
+        "notes": "The target is pinned in rust-toolchain.toml. Was ci.yml's wasm job; about 5 s from cold, so before every push rather than only a release."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "kind": "test",
+        "name": "wasm32 without std, with serde",
+        "run": "cargo build --no-default-features --features serde --target wasm32-unknown-unknown",
+        "code": "src/*.rs",
+        "on": "push",
+        "notes": "serde builds with alloc only, for no_std users such as parda on wasm. Was ci.yml's wasm job."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-991e1313467a",
+      "check": {
+        "kind": "test",
+        "name": "clippy, serde alone",
+        "run": "cargo clippy --no-default-features --features serde --all-targets -- -D warnings",
+        "on": "release"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-9923f494ac39",
+      "check": {
+        "kind": "test",
+        "name": "clippy, log alone",
+        "run": "cargo clippy --no-default-features --features log --all-targets -- -D warnings",
+        "on": "release"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-992b79e41f6b",
+      "check": {
+        "kind": "test",
+        "name": "clippy, sign alone",
+        "run": "cargo clippy --no-default-features --features sign --all-targets -- -D warnings",
+        "on": "release"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-992ce7c6cabf",
+      "check": {
+        "kind": "test",
+        "name": "clippy, sqlite alone",
+        "run": "cargo clippy --no-default-features --features sqlite --all-targets -- -D warnings",
+        "on": "release"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-992dbfe69eee",
+      "check": {
+        "kind": "test",
+        "name": "clippy, crypt alone",
+        "run": "cargo clippy --no-default-features --features crypt --all-targets -- -D warnings",
+        "on": "release",
+        "notes": "Its first run found two imports only the sqlite codec uses, unused with crypt alone."
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-992f2903473a",
+      "check": {
+        "kind": "test",
+        "name": "clippy, knowledge alone",
+        "run": "cargo clippy --no-default-features --features knowledge --all-targets -- -D warnings",
+        "on": "release"
+      }
+    },
+    {
+      "op": "node.check.set",
+      "node": "01a10a54-fb7a-755d-acab-992f2903473a",
+      "check": {
+        "kind": "test",
+        "name": "clippy, ts alone",
+        "run": "cargo clippy --no-default-features --features ts --all-targets -- -D warnings",
+        "on": "release"
+      }
+    },
+    {
+      "op": "claim.add",
+      "id": "01a1ed12-2833-721d-9fe7-166f3ea8e358",
+      "node": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+      "text": "What CI ran is declared checks: per commit, before a push, before a release",
+      "why": "sylva is closed to contributions, so ci.closed holds: .github/workflows/ (ci.yml, deny.yml) is deleted and Actions is off. What CI ran is now declared checks that tend's hooks run. Per commit, where a change reaches: clippy and tests with all features (as before), tests without std (as before) and clippy without std (new, on Structures). Before a push: clippy and tests with default features (std alone), and the two wasm32 builds without std (plain and with serde), measured at about 5 s and 3 s from cold here, cheap enough not to wait for a release. Before a release, behind a blocking gate on every test: clippy with each feature alone on the node it carries (serde, log, sign, sqlite, crypt, knowledge, ts; std alone is the default set), which CI never ran and which found a real failure on its first run, and cargo deny (advisories, bans, sources). The `ci on GitHub` gate goes, since no run will ever exist to read. If sylva opens to contributions, CI comes back under ci.open, built from these same checks.",
+      "rests_on": [
+        {
+          "of": "claim:01a1c2a9-c7de-7147-bcd1-7e3472db9174",
+          "at": "fp:51cde35c6028",
+          "checked": "2026-11-18"
+        }
+      ]
+    }
+  ],
+  "at": 1794978861414,
+  "from_draft": "01a1ed0d-8a53-7746-8331-23bc07061708",
+  "origin": {
+    "model": "opus",
+    "harness": "claude-code 2.1.327",
+    "session": "452abace-a5f9-4e57-b7a2-99053f8d3f52",
+    "machine": "VGHYDRA",
+    "repo": "C:/Users/Vaibhav/AppData/Roaming/tend/hub/worktrees/sylva-ci-local-2b7a27c454f1",
+    "branch": "hub/ci-local-2b7a27c454f1",
+    "commit": "0ba656d",
+    "tend": "tend 0.1.0",
+    "via": "hub-worker",
+    "parent": "measure",
+    "worker": "2b7a27c454f1"
+  }
+}

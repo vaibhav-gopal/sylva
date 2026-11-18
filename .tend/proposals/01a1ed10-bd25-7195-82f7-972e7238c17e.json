@@ -1,0 +1,34 @@
+{
+  "id": "01a1ed10-bd25-7195-82f7-972e7238c17e",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "author": "agent:hub-worker",
+  "agent": "01a1d19f-fa21-7026-b108-1b85e68175e5",
+  "rationale": "Recorded as it happened: the first run of the per-feature checks moved out of CI found a real build failure.",
+  "why": "this agent's trust level is `propose`",
+  "ops": [
+    {
+      "op": "journal.add",
+      "id": "01a1ed10-97d9-757e-aa1c-b9805b8e93c1",
+      "kind": "misstep",
+      "node": "01a10a54-fb7a-755d-acab-992dbfe69eee",
+      "title": "crypt alone didn't build under clippy: imports only the sqlite codec uses",
+      "body": "`cargo clippy --no-default-features --features crypt --all-targets -- -D warnings` failed on two unused imports in src/log/crypt.rs (serde::Serialize, serde::de::DeserializeOwned), which only the sqlite-gated Encrypted codec uses. CI never caught it: it ran clippy under all, default and no default features, never a feature alone. Fixed by gating both imports with #[cfg(feature = \"sqlite\")]. Lesson: a feature's code is checked with that feature alone, so imports and helpers that serve another feature carry that feature's cfg; the per-feature clippy checks are now declared as release gates.",
+      "supersedes": null
+    }
+  ],
+  "at": 1794978659621,
+  "from_draft": "01a1ed0d-8a53-7746-8331-23bc07061708",
+  "origin": {
+    "model": "opus",
+    "harness": "claude-code 2.1.327",
+    "session": "452abace-a5f9-4e57-b7a2-99053f8d3f52",
+    "machine": "VGHYDRA",
+    "repo": "C:/Users/Vaibhav/AppData/Roaming/tend/hub/worktrees/sylva-ci-local-2b7a27c454f1",
+    "branch": "hub/ci-local-2b7a27c454f1",
+    "commit": "0ba656d",
+    "tend": "tend 0.1.0",
+    "via": "hub-worker",
+    "parent": "measure",
+    "worker": "2b7a27c454f1"
+  }
+}

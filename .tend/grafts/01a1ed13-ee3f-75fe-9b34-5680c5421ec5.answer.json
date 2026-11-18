@@ -1,0 +1,23 @@
+{
+  "id": "01a1ed13-ee3f-75fe-9b34-5680c5421ec5",
+  "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702",
+  "event": {
+    "kind": "op",
+    "op": {
+      "type": "graft.triage",
+      "ids": [
+        "01a19343-7ac2-7268-8fee-9799a2e35db4"
+      ],
+      "status": "planned",
+      "answer": {
+        "text": "Taken as your 2026-10-31 update says (ci.closed). What only CI ran is now declared checks, in proposal 01a1ed13-d166 (waiting for the user). Per commit: clippy without std, new on sylva/Structures, alongside the existing clippy and tests with all features and tests without std. Before a push: clippy and tests with default features (std alone) on sylva, and the wasm32 builds without std, plain and with serde, on sylva/Structures. Before a release, behind a blocking `release` gate on every test: clippy with each feature alone, each on the node it carries (serde on Structures, log on Log, sign on Log/Signatures, sqlite on Log/SQLite store, crypt on Log/Encryption at rest, knowledge and ts on Knowledge), plus cargo deny (advisories, bans, sources) on sylva. The `ci on GitHub` gate is removed. All of these passed on vghydra except cargo deny, which isn't installed there. The first run of crypt alone found unused imports, fixed in fb7a148 on branch hub/ci-local-2b7a27c454f1. Still to do: deleting .github/workflows/ (ci.yml, deny.yml). The worker session wasn't allowed to delete files, so the user deletes them. Marked done once that lands.",
+        "node": "sylva",
+        "by": {
+          "who": "agent:hub-worker",
+          "project": "01a10a4b-cdce-72a2-82d1-d5122b03d702"
+        },
+        "at": 1794978868797
+      }
+    }
+  }
+}
